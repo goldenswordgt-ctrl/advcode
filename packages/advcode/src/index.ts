@@ -28,6 +28,10 @@ import { SessionCommand } from "./cli/cmd/session"
 import { DbCommand } from "./cli/cmd/db"
 import { errorMessage } from "./util/error"
 import { PluginCommand } from "./cli/cmd/plug"
+import { MemoryCommand } from "./cli/cmd/memory"
+import { SkillCommand } from "./cli/cmd/skill"
+import { BotCommand } from "./cli/cmd/bot"
+import { LearnCommand } from "./cli/cmd/learn"
 import { Heap } from "./cli/heap"
 
 const args = hideBin(process.argv)
@@ -100,6 +104,10 @@ const cli = yargs(args)
   .command(PrCommand)
   .command(SessionCommand)
   .command(PluginCommand)
+  .command(MemoryCommand)
+  .command(SkillCommand)
+  .command(BotCommand)
+  .command(LearnCommand)
   .command(DbCommand)
   .fail((msg, err) => {
     if (
