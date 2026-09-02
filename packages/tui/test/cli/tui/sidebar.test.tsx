@@ -53,7 +53,6 @@ function renderSidebar(opts: RenderOpts = {}) {
           <TuiConfigProvider config={config as TuiConfig.Resolved}>
             <KVProvider>
               <SyncContext.Provider value={sync}>
-                {/* @ts-expect-error stubbed plugin runtime */}
                 <PanelContext.Provider value={panel}>
                   <ThemeProvider mode="dark">
                     <Sidebar sessionID="session-1" />
