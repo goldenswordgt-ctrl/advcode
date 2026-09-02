@@ -30,7 +30,7 @@ const docsGithubHref = getRelativeLocaleUrl(locale, "github")
 
 const command = "curl -fsSL"
 const protocol = "https://"
-const url = "opencode.ai/install"
+const url = "github.com/goldenswordgt-ctrl/advcode"
 const bash = "| bash"
 
 let darkImage: ImageMetadata | undefined;
@@ -94,7 +94,7 @@ if (image) {
     <section class="alternatives">
       <div class="col1">
         <h3>npm</h3>
-        <button class="command" data-command="npm install -g opencode-ai">
+        <button class="command" data-command="npm install -g advcode-ai">
           <code>
             <span>npm install -g</span> <span class="highlight">opencode-ai</span>
           </code>
@@ -106,7 +106,7 @@ if (image) {
       </div>
       <div class="col2">
         <h3>Bun</h3>
-        <button class="command" data-command="bun install -g opencode-ai">
+        <button class="command" data-command="bun install -g advcode-ai">
           <code>
             <span>bun install -g</span> <span class="highlight">opencode-ai</span>
           </code>
@@ -118,9 +118,9 @@ if (image) {
       </div>
       <div class="col3">
         <h3>Homebrew</h3>
-        <button class="command" data-command="brew install opencode">
+        <button class="command" data-command="brew install advcode">
           <code>
-            <span>brew install</span> <span class="highlight">opencode</span>
+            <span>brew install</span> <span class="highlight">advcode</span>
           </code>
           <span class="copy">
             <CopyIcon />
@@ -129,10 +129,10 @@ if (image) {
         </button>
       </div>
       <div class="col4">
-        <h3>Paru</h3>
-        <button class="command" data-command="paru -S opencode-bin">
+        <h3>GitHub</h3>
+        <button class="command" data-command="bunx advcode-ai">
           <code>
-            <span>paru -S</span> <span class="highlight">opencode-bin</span>
+            <span>bunx</span> <span class="highlight">advcode-ai</span>
           </code>
           <span class="copy">
             <CopyIcon />
@@ -142,9 +142,9 @@ if (image) {
       </div>
       <div class="col4">
         <h3>Mise</h3>
-        <button class="command" data-command="mise use -g github:anomalyco/opencode">
+        <button class="command" data-command="mise use -g github:goldenswordgt-ctrl/advcode">
           <code>
-            <span>mise use -g</span> <span class="highlight">github:anomalyco/opencode</span>
+            <span>mise use -g</span> <span class="highlight">github:goldenswordgt-ctrl/advcode</span>
           </code>
           <span class="copy">
             <CopyIcon />
