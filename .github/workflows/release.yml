@@ -1,0 +1,59 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    # arm64 runner so we produce a native Apple Silicon binary
+    runs-on: macos-14-xlarge
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Build darwin-arm64 binary
+        run: |
+          bun install
+          bun run --cwd packages/advcode build --single
+
+      - name: Package tarball
+        run: |
+          mkdir -p release
+          cp packages/advcode/dist/advcode-darwin-arm64/bin/advcode release/advcode
+          chmod 755 release/advcode
+          tar -czf advcode-darwin-arm64.tar.gz -C release advcode
+          echo "SHA=$(shasum -a 256 advcode-darwin-arm64.tar.gz | awk '{print $1}')" >> $GITHUB_ENV
+          echo "SIZE=$(stat -f%z advcode-darwin-arm64.tar.gz)" >> $GITHUB_ENV
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "advcode ${{ github.ref_name }}"
+          files: advcode-darwin-arm64.tar.gz
+          generate_release_notes: true
+
+      - name: Update Homebrew tap formula
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          git clone https://x-access-token:${GH_TOKEN}@github.com/goldenswordgt-ctrl/homebrew-advcode.git tap
+          cd tap
+          sed -i '' \
+            "s|url \".*advcode/releases/download/.*/advcode-darwin-arm64.tar.gz\"|url \"https://github.com/goldenswordgt-ctrl/advcode/releases/download/${GITHUB_REF_NAME}/advcode-darwin-arm64.tar.gz\"|" \
+            Formula/advcode.rb
+          sed -i '' "s|sha256 \"[a-f0-9]\{64\}\"|sha256 \"${{ env.SHA }}\"|" Formula/advcode.rb
+          sed -i '' "s|version \"[^\"]*\"|version \"${GITHUB_REF_NAME#v}\"|" Formula/advcode.rb
+          git config user.email "advcode-bot@users.noreply.github.com"
+          git config user.name "advcode-bot"
+          git add Formula/advcode.rb
+          git commit -m "advcode ${GITHUB_REF_NAME}" || echo "nothing to commit"
+          git push
