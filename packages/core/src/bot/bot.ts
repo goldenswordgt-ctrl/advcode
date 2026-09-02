@@ -137,7 +137,7 @@ const layer = Layer.effect(
       const now = Date.now()
       yield* db
         .insert(BotMessageTable)
-        .values({ id, bot_id: bot.id, channel: input.channel, body: input.body, time_created: now })
+        .values({ id, bot_id: bot.id, channel: input.channel, body: input.body, time_created: now, time_updated: now })
         .run()
         .pipe(Effect.orDie)
       return { id, bot_id: bot.id, channel: input.channel, body: input.body, time_created: now } satisfies BotMessage

@@ -96,7 +96,8 @@ export default {
           \`bot_id\` text NOT NULL,
           \`channel\` text NOT NULL,
           \`body\` text NOT NULL,
-          \`time_created\` integer NOT NULL
+          \`time_created\` integer NOT NULL,
+          \`time_updated\` integer NOT NULL
         );
       `)
       yield* tx.run(`

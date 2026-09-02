@@ -21,6 +21,7 @@ import { QuestionV2 } from "../../question"
 import { SystemContext } from "../../system-context/index"
 import { SystemContextRegistry } from "../../system-context/registry"
 import { SkillGuidance } from "../../skill/guidance"
+import { SelfLearning } from "../../skill/self-learn"
 import { ReferenceGuidance } from "../../reference/guidance"
 import { ToolRegistry } from "../../tool/registry"
 import { ToolOutputStore } from "../../tool-output-store"
@@ -105,6 +106,7 @@ const layer = Layer.effect(
     const referenceGuidance = yield* ReferenceGuidance.Service
     const config = yield* Config.Service
     const snapshots = yield* Snapshot.Service
+    const selfLearning = yield* SelfLearning.Service
     const db = (yield* Database.Service).db
     const compaction = SessionCompaction.make({ events, llm, config: yield* config.entries() })
     const getSession = Effect.fn("SessionRunner.getSession")(function* (sessionID: SessionSchema.ID) {
@@ -407,6 +409,9 @@ const layer = Layer.effect(
           promotion = "steer"
           if (!needsContinuation) needsContinuation = yield* SessionInput.hasPending(db, input.sessionID, "steer")
         }
+        yield* selfLearning
+          .learnFromTurn({ sessionID: input.sessionID, worked: true })
+          .pipe(Effect.forkDetach)
         shouldRun = yield* SessionInput.hasPending(db, input.sessionID, "queue")
         promotion = shouldRun ? "queue" : undefined
       }
@@ -431,6 +436,7 @@ export const node = makeLocationNode({
     Location.node,
     SystemContextRegistry.node,
     SkillGuidance.node,
+    SelfLearning.node,
     ReferenceGuidance.node,
     Config.node,
     Snapshot.node,

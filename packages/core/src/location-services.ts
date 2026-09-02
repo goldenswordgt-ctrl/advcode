@@ -30,8 +30,11 @@ import { SessionTodo } from "./session/todo"
 import { SkillV2 } from "./skill"
 import { SkillGuidance } from "./skill/guidance"
 import { SkillLearning } from "./skill/learning"
+import { SelfLearning } from "./skill/self-learn"
 import { MemoryV2 } from "./memory/memory"
+import { MemoryContext } from "./memory/context"
 import { BotMode } from "./bot/bot"
+import { BotRunner } from "./bot/runner"
 import { Snapshot } from "./snapshot"
 import { SystemContextBuiltIns } from "./system-context/builtins"
 import { SystemContextRegistry } from "./system-context/registry"
@@ -62,11 +65,14 @@ export const locationServices = LayerNode.group([
   Pty.node,
   SkillV2.node,
   SkillLearning.node,
+  SelfLearning.node,
   MemoryV2.node,
   BotMode.node,
+  BotRunner.node,
   SkillGuidance.node,
   SystemContextRegistry.node,
   SystemContextBuiltIns.node,
+  MemoryContext.node,
   LocationMutation.node,
   FileMutation.node,
   PermissionV2.node,
@@ -119,3 +125,10 @@ export function buildLocationServiceMap(
 
 // This is temporary for backwards compatibility
 export const locationServiceMapLayer = buildLocationServiceMap()
+
+// Global v2 nodes (Database, MemoryV2, BotMode, ...) are hoisted out of the
+// per-location map and compiled inside its factory, so they are not reachable
+// by name from outside the map. Export the compiled hoisted layer so effects
+// can provide it explicitly (CLI commands, tests) alongside the location map.
+const locationHoist = LayerNode.hoist(locationServices, Node.tags.values.global)
+export const locationGlobalServices = LayerNode.compile(locationHoist.hoisted)
