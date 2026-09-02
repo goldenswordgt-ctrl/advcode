@@ -1,9 +1,10 @@
 export * as BotMode from "./bot"
 
 import { Context, Effect, Layer, Schema } from "effect"
-import { Database } from "../database"
+import { Database } from "../database/database"
 import { BotAgentTable, BotMessageTable } from "./sql"
 import { eq, desc } from "drizzle-orm"
+import { makeGlobalNode } from "../effect/app-node"
 
 /**
  * BotMode — named agents with faces, talking in group chats.
@@ -48,7 +49,7 @@ export interface Interface {
   /** Get a bot by name. */
   readonly get: (name: string) => Effect.Effect<Bot | undefined>
   /** Post a message to a channel as a bot. */
-  readonly post: (input: { bot_name: string; channel: string; body: string }) => Effect.Effect<BotMessage>
+  readonly post: (input: { bot_name: string; channel: string; body: string }) => Effect.Effect<BotMessage, Error>
   /** Read recent messages in a channel. */
   readonly read: (channel: string, limit?: number) => Effect.Effect<BotMessage[]>
   /** Remove a bot and its messages. */
@@ -65,8 +66,9 @@ const layer = Layer.effect(
     const register = Effect.fn("BotMode.register")(function* (input) {
       const id = crypto.randomUUID()
       const now = Date.now()
-      yield* Effect.tryPromise(() =>
-        db.insert(BotAgentTable).values({
+      yield* db
+        .insert(BotAgentTable)
+        .values({
           id,
           name: input.name,
           persona: input.persona ?? null,
@@ -75,8 +77,9 @@ const layer = Layer.effect(
           system_prompt: input.system_prompt ?? null,
           time_created: now,
           time_updated: now,
-        }),
-      )
+        })
+        .run()
+        .pipe(Effect.orDie)
       return {
         id,
         name: input.name,
@@ -89,7 +92,12 @@ const layer = Layer.effect(
     })
 
     const list = Effect.fn("BotMode.list")(function* () {
-      const rows = yield* Effect.tryPromise(() => db.select().from(BotAgentTable).orderBy(desc(BotAgentTable.time_created)))
+      const rows = yield* db
+        .select()
+        .from(BotAgentTable)
+        .orderBy(desc(BotAgentTable.time_created))
+        .all()
+        .pipe(Effect.orDie)
       return rows.map((row) => ({
         id: row.id,
         name: row.name,
@@ -102,9 +110,13 @@ const layer = Layer.effect(
     })
 
     const get = Effect.fn("BotMode.get")(function* (name) {
-      const rows = yield* Effect.tryPromise(() =>
-        db.select().from(BotAgentTable).where(eq(BotAgentTable.name, name)).limit(1),
-      )
+      const rows = yield* db
+        .select()
+        .from(BotAgentTable)
+        .where(eq(BotAgentTable.name, name))
+        .limit(1)
+        .all()
+        .pipe(Effect.orDie)
       const row = rows[0]
       if (!row) return undefined
       return {
@@ -123,21 +135,23 @@ const layer = Layer.effect(
       if (!bot) return yield* Effect.fail(new Error(`unknown bot: ${input.bot_name}`))
       const id = crypto.randomUUID()
       const now = Date.now()
-      yield* Effect.tryPromise(() =>
-        db.insert(BotMessageTable).values({ id, bot_id: bot.id, channel: input.channel, body: input.body, time_created: now }),
-      )
+      yield* db
+        .insert(BotMessageTable)
+        .values({ id, bot_id: bot.id, channel: input.channel, body: input.body, time_created: now })
+        .run()
+        .pipe(Effect.orDie)
       return { id, bot_id: bot.id, channel: input.channel, body: input.body, time_created: now } satisfies BotMessage
     })
 
     const read = Effect.fn("BotMode.read")(function* (channel, limit = 50) {
-      const rows = yield* Effect.tryPromise(() =>
-        db
-          .select()
-          .from(BotMessageTable)
-          .where(eq(BotMessageTable.channel, channel))
-          .orderBy(desc(BotMessageTable.time_created))
-          .limit(limit),
-      )
+      const rows = yield* db
+        .select()
+        .from(BotMessageTable)
+        .where(eq(BotMessageTable.channel, channel))
+        .orderBy(desc(BotMessageTable.time_created))
+        .limit(limit)
+        .all()
+        .pipe(Effect.orDie)
       return rows.map((row) => ({
         id: row.id,
         bot_id: row.bot_id,
@@ -150,14 +164,12 @@ const layer = Layer.effect(
     const unregister = Effect.fn("BotMode.unregister")(function* (name) {
       const bot = yield* get(name)
       if (!bot) return
-      yield* Effect.tryPromise(() => db.delete(BotMessageTable).where(eq(BotMessageTable.bot_id, bot.id))).pipe(
-        Effect.ignore,
-      )
-      yield* Effect.tryPromise(() => db.delete(BotAgentTable).where(eq(BotAgentTable.id, bot.id))).pipe(Effect.ignore)
+      yield* db.delete(BotMessageTable).where(eq(BotMessageTable.bot_id, bot.id)).run().pipe(Effect.ignore)
+      yield* db.delete(BotAgentTable).where(eq(BotAgentTable.id, bot.id)).run().pipe(Effect.ignore)
     })
 
     return Service.of({ register, list, get, post, read, unregister })
   }),
 )
 
-export const node = Layer.provide(layer, Database.node)
+export const node = makeGlobalNode({ service: Service, layer, deps: [Database.node] })

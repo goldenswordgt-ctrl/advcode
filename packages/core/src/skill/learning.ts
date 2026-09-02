@@ -2,11 +2,12 @@ export * as SkillLearning from "./learning"
 
 import path from "path"
 import { Context, Effect, Layer, Schema } from "effect"
-import { Database } from "../database"
+import { Database } from "../database/database"
 import { FSUtil } from "../fs-util"
 import { Global } from "../global"
 import { SkillLearnedTable } from "./sql"
-import { eq, desc, sql } from "drizzle-orm"
+import { desc, eq, sql } from "drizzle-orm"
+import { makeGlobalNode } from "../effect/app-node"
 
 /**
  * SkillLearning — the learning loop.
@@ -37,7 +38,7 @@ export interface Interface {
     description?: string
     content: string
     source_session_id?: string
-  }) => Effect.Effect<LearnedSkill>
+  }) => Effect.Effect<LearnedSkill, Error>
   /** Read a learned skill by name. */
   readonly get: (name: string) => Effect.Effect<LearnedSkill | undefined>
   /** List learned skills, newest first. */
@@ -87,18 +88,22 @@ const layer = Layer.effect(
       const id = crypto.randomUUID()
       const now = Date.now()
 
-      yield* Effect.tryPromise(() => fs.writeFileString(fileFor(input.name), renderMarkdown(input), { recursive: true }))
+      yield* fs.writeWithDirs(fileFor(input.name), renderMarkdown(input)).pipe(Effect.orDie)
 
-      const existing = yield* Effect.tryPromise(() =>
-        db.select().from(SkillLearnedTable).where(eq(SkillLearnedTable.name, input.name)).limit(1),
-      )
+      const existing = yield* db
+        .select()
+        .from(SkillLearnedTable)
+        .where(eq(SkillLearnedTable.name, input.name))
+        .limit(1)
+        .all()
+        .pipe(Effect.orDie)
       if (existing[0]) {
-        yield* Effect.tryPromise(() =>
-          db
-            .update(SkillLearnedTable)
-            .set({ content: input.content, description: input.description ?? null, time_updated: now })
-            .where(eq(SkillLearnedTable.name, input.name)),
-        )
+        yield* db
+          .update(SkillLearnedTable)
+          .set({ content: input.content, description: input.description ?? null, time_updated: now })
+          .where(eq(SkillLearnedTable.name, input.name))
+          .run()
+          .pipe(Effect.orDie)
         return {
           id: existing[0].id,
           name: input.name,
@@ -111,8 +116,9 @@ const layer = Layer.effect(
         } satisfies LearnedSkill
       }
 
-      yield* Effect.tryPromise(() =>
-        db.insert(SkillLearnedTable).values({
+      yield* db
+        .insert(SkillLearnedTable)
+        .values({
           id,
           name: input.name,
           description: input.description ?? null,
@@ -122,8 +128,9 @@ const layer = Layer.effect(
           times_improved: 0,
           time_created: now,
           time_updated: now,
-        }),
-      )
+        })
+        .run()
+        .pipe(Effect.orDie)
       return {
         id,
         name: input.name,
@@ -137,27 +144,33 @@ const layer = Layer.effect(
     })
 
     const get = Effect.fn("SkillLearning.get")(function* (name) {
-      const rows = yield* Effect.tryPromise(() =>
-        db.select().from(SkillLearnedTable).where(eq(SkillLearnedTable.name, name)).limit(1),
-      )
-      const row = rows[0]
-      if (!row) return undefined
+      const row = yield* db
+        .select()
+        .from(SkillLearnedTable)
+        .where(eq(SkillLearnedTable.name, name))
+        .limit(1)
+        .all()
+        .pipe(Effect.orDie)
+      if (!row[0]) return undefined
       return {
-        id: row.id,
-        name: row.name,
-        description: row.description ?? undefined,
-        content: row.content,
-        source_session_id: row.source_session_id ?? undefined,
-        times_used: row.times_used,
-        times_improved: row.times_improved,
-        time_created: row.time_created,
+        id: row[0].id,
+        name: row[0].name,
+        description: row[0].description ?? undefined,
+        content: row[0].content,
+        source_session_id: row[0].source_session_id ?? undefined,
+        times_used: row[0].times_used,
+        times_improved: row[0].times_improved,
+        time_created: row[0].time_created,
       } satisfies LearnedSkill
     })
 
     const list = Effect.fn("SkillLearning.list")(function* () {
-      const rows = yield* Effect.tryPromise(() =>
-        db.select().from(SkillLearnedTable).orderBy(desc(SkillLearnedTable.time_created)),
-      )
+      const rows = yield* db
+        .select()
+        .from(SkillLearnedTable)
+        .orderBy(desc(SkillLearnedTable.time_created))
+        .all()
+        .pipe(Effect.orDie)
       return rows.map((row) => ({
         id: row.id,
         name: row.name,
@@ -171,28 +184,30 @@ const layer = Layer.effect(
     })
 
     const recordUse = Effect.fn("SkillLearning.recordUse")(function* (name) {
-      yield* Effect.tryPromise(() =>
-        db
-          .update(SkillLearnedTable)
-          .set({ times_used: sql`times_used + 1`, last_used_at: Date.now(), time_updated: Date.now() })
-          .where(eq(SkillLearnedTable.name, name)),
-      ).pipe(Effect.ignore)
+      yield* db
+        .update(SkillLearnedTable)
+        .set({ times_used: sql`times_used + 1`, last_used_at: Date.now(), time_updated: Date.now() })
+        .where(eq(SkillLearnedTable.name, name))
+        .run()
+        .pipe(Effect.orDie)
     })
 
     const recordImprovement = Effect.fn("SkillLearning.recordImprovement")(function* (name) {
-      yield* Effect.tryPromise(() =>
-        db
-          .update(SkillLearnedTable)
-          .set({ times_improved: sql`times_improved + 1`, time_updated: Date.now() })
-          .where(eq(SkillLearnedTable.name, name)),
-      ).pipe(Effect.ignore)
+      yield* db
+        .update(SkillLearnedTable)
+        .set({ times_improved: sql`times_improved + 1`, time_updated: Date.now() })
+        .where(eq(SkillLearnedTable.name, name))
+        .run()
+        .pipe(Effect.orDie)
     })
 
     const remove = Effect.fn("SkillLearning.remove")(function* (name) {
-      yield* Effect.tryPromise(() => fs.remove(fileFor(name), { force: true })).pipe(Effect.ignore)
-      yield* Effect.tryPromise(() => db.delete(SkillLearnedTable).where(eq(SkillLearnedTable.name, name))).pipe(
-        Effect.ignore,
-      )
+      yield* fs.remove(fileFor(name), { recursive: true, force: true }).pipe(Effect.orDie)
+      yield* db
+        .delete(SkillLearnedTable)
+        .where(eq(SkillLearnedTable.name, name))
+        .run()
+        .pipe(Effect.orDie)
     })
 
     const directory = Effect.fn("SkillLearning.directory")(function* () {
@@ -203,4 +218,8 @@ const layer = Layer.effect(
   }),
 )
 
-export const node = Layer.provide(layer, Database.node, FSUtil.node, Global.node)
+export const node = makeGlobalNode({
+  service: Service,
+  layer,
+  deps: [Database.node, FSUtil.node, Global.node],
+})

@@ -1,9 +1,10 @@
 export * as MemoryV2 from "./memory"
 
 import { Context, Effect, Layer, Schema } from "effect"
-import { Database } from "../database"
+import { Database } from "../database/database"
 import { MemoryEntryTable, MemoryUserModelTable } from "./sql"
 import { eq, and, desc, like, gt } from "drizzle-orm"
+import { makeGlobalNode } from "../effect/app-node"
 
 /**
  * MemoryV2 — distilled cross-session memory.
@@ -14,14 +15,14 @@ import { eq, and, desc, like, gt } from "drizzle-orm"
  * what workflows work. This is the "coworker who remembers you" part.
  */
 
-export const Type = Schema.Literal(
+export const Type = Schema.Literals([
   "user", // facts about the user
   "project", // facts about a project/repo
   "workflow", // facts about how work gets done
   "preference", // user preferences
   "decision", // decisions made and why
   "lesson", // lessons learned
-)
+])
 export type Type = typeof Type.Type
 
 export const Entry = Schema.Struct({
@@ -68,17 +69,21 @@ const layer = Layer.effect(
 
     const remember = Effect.fn("MemoryV2.remember")(function* (input) {
       const id = crypto.randomUUID()
-      const existing = yield* Effect.tryPromise(() =>
-        db.select().from(MemoryEntryTable).where(eq(MemoryEntryTable.key, input.key)).limit(1),
-      )
+      const existing = yield* db
+        .select()
+        .from(MemoryEntryTable)
+        .where(and(eq(MemoryEntryTable.type, input.type), eq(MemoryEntryTable.key, input.key)))
+        .limit(1)
+        .all()
+        .pipe(Effect.orDie)
       const row = existing[0]
       if (row) {
-        yield* Effect.tryPromise(() =>
-          db
-            .update(MemoryEntryTable)
-            .set({ value: input.value, importance: input.importance ?? row.importance, time_updated: Date.now() })
-            .where(eq(MemoryEntryTable.id, row.id)),
-        )
+        yield* db
+          .update(MemoryEntryTable)
+          .set({ value: input.value, importance: input.importance ?? row.importance, time_updated: Date.now() })
+          .where(eq(MemoryEntryTable.id, row.id))
+          .run()
+          .pipe(Effect.orDie)
         return {
           id: row.id,
           session_id: row.session_id ?? undefined,
@@ -90,8 +95,9 @@ const layer = Layer.effect(
           time_created: row.time_created,
         } satisfies Entry
       }
-      yield* Effect.tryPromise(() =>
-        db.insert(MemoryEntryTable).values({
+      yield* db
+        .insert(MemoryEntryTable)
+        .values({
           id,
           session_id: input.session_id ?? null,
           type: input.type,
@@ -102,8 +108,9 @@ const layer = Layer.effect(
           time_created: Date.now(),
           time_updated: Date.now(),
           time_last_accessed: Date.now(),
-        }),
-      )
+        })
+        .run()
+        .pipe(Effect.orDie)
       return {
         id,
         session_id: input.session_id,
@@ -122,24 +129,25 @@ const layer = Layer.effect(
       if (opts.type) conditions.push(eq(MemoryEntryTable.type, opts.type))
       if (opts.key) conditions.push(like(MemoryEntryTable.key, `%${opts.key}%`))
       const where = conditions.length > 0 ? and(...conditions) : undefined
-      const rows = yield* Effect.tryPromise(() =>
-        where
-          ? db.select().from(MemoryEntryTable).where(where).orderBy(desc(MemoryEntryTable.importance)).limit(limit)
-          : db.select().from(MemoryEntryTable).orderBy(desc(MemoryEntryTable.importance)).limit(limit),
+      const rows = yield* (where
+        ? db
+            .select()
+            .from(MemoryEntryTable)
+            .where(where)
+            .orderBy(desc(MemoryEntryTable.importance))
+            .limit(limit)
+            .all()
+        : db.select().from(MemoryEntryTable).orderBy(desc(MemoryEntryTable.importance)).limit(limit).all()).pipe(
+        Effect.orDie,
       )
       // Touch last-accessed for recency-biased recall.
       if (rows.length > 0) {
-        yield* Effect.tryPromise(() =>
-          db
-            .update(MemoryEntryTable)
-            .set({ time_last_accessed: Date.now() })
-            .where(
-              eq(
-                MemoryEntryTable.id,
-                rows[0].id,
-              ),
-            ),
-        ).pipe(Effect.ignore)
+        yield* db
+          .update(MemoryEntryTable)
+          .set({ time_last_accessed: Date.now() })
+          .where(eq(MemoryEntryTable.id, rows[0].id))
+          .run()
+          .pipe(Effect.ignore)
       }
       return rows.map((r) => ({
         id: r.id,
@@ -154,14 +162,14 @@ const layer = Layer.effect(
     })
 
     const search = Effect.fn("MemoryV2.search")(function* (query, limit = 20) {
-      const rows = yield* Effect.tryPromise(() =>
-        db
-          .select()
-          .from(MemoryEntryTable)
-          .where(like(MemoryEntryTable.value, `%${query}%`))
-          .orderBy(desc(MemoryEntryTable.importance))
-          .limit(limit),
-      )
+      const rows = yield* db
+        .select()
+        .from(MemoryEntryTable)
+        .where(like(MemoryEntryTable.value, `%${query}%`))
+        .orderBy(desc(MemoryEntryTable.importance))
+        .limit(limit)
+        .all()
+        .pipe(Effect.orDie)
       return rows.map((r) => ({
         id: r.id,
         session_id: r.session_id ?? undefined,
@@ -180,33 +188,38 @@ const layer = Layer.effect(
 
     const forget = Effect.fn("MemoryV2.forget")(function* (opts) {
       if (opts.id) {
-        yield* Effect.tryPromise(() => db.delete(MemoryEntryTable).where(eq(MemoryEntryTable.id, opts.id)))
+        yield* db.delete(MemoryEntryTable).where(eq(MemoryEntryTable.id, opts.id)).run().pipe(Effect.orDie)
         return
       }
       if (opts.type && opts.key) {
-        yield* Effect.tryPromise(() =>
-          db
-            .delete(MemoryEntryTable)
-            .where(and(eq(MemoryEntryTable.type, opts.type), eq(MemoryEntryTable.key, opts.key))),
-        )
+        yield* db
+          .delete(MemoryEntryTable)
+          .where(and(eq(MemoryEntryTable.type, opts.type), eq(MemoryEntryTable.key, opts.key)))
+          .run()
+          .pipe(Effect.orDie)
       }
     })
 
     const rememberUser = Effect.fn("MemoryV2.rememberUser")(function* (input) {
-      const existing = yield* Effect.tryPromise(() =>
-        db.select().from(MemoryUserModelTable).where(eq(MemoryUserModelTable.key, input.key)).limit(1),
-      )
+      const existing = yield* db
+        .select()
+        .from(MemoryUserModelTable)
+        .where(eq(MemoryUserModelTable.key, input.key))
+        .limit(1)
+        .all()
+        .pipe(Effect.orDie)
       const confidence = input.confidence ?? 0.5
       if (existing[0]) {
-        yield* Effect.tryPromise(() =>
-          db
-            .update(MemoryUserModelTable)
-            .set({ value: input.value, confidence, time_updated: Date.now() })
-            .where(eq(MemoryUserModelTable.id, existing[0].id)),
-        )
+        yield* db
+          .update(MemoryUserModelTable)
+          .set({ value: input.value, confidence, time_updated: Date.now() })
+          .where(eq(MemoryUserModelTable.id, existing[0].id))
+          .run()
+          .pipe(Effect.orDie)
       } else {
-        yield* Effect.tryPromise(() =>
-          db.insert(MemoryUserModelTable).values({
+        yield* db
+          .insert(MemoryUserModelTable)
+          .values({
             id: crypto.randomUUID(),
             key: input.key,
             value: input.value,
@@ -214,15 +227,19 @@ const layer = Layer.effect(
             source_session_id: input.session_id ?? null,
             time_created: Date.now(),
             time_updated: Date.now(),
-          }),
-        )
+          })
+          .run()
+          .pipe(Effect.orDie)
       }
     })
 
     const recallUser = Effect.fn("MemoryV2.recallUser")(function* () {
-      const rows = yield* Effect.tryPromise(() =>
-        db.select().from(MemoryUserModelTable).orderBy(desc(MemoryUserModelTable.confidence)),
-      )
+      const rows = yield* db
+        .select()
+        .from(MemoryUserModelTable)
+        .orderBy(desc(MemoryUserModelTable.confidence))
+        .all()
+        .pipe(Effect.orDie)
       return rows.map((r) => ({ key: r.key, value: r.value, confidence: r.confidence }))
     })
 
@@ -238,4 +255,4 @@ const layer = Layer.effect(
   }),
 )
 
-export const node = Layer.provide(layer, Database.node)
+export const node = makeGlobalNode({ service: Service, layer, deps: [Database.node] })

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "advcode",
+  "name": "advcode-monorepo",
   "description": "advcode \u2014 the AI coding agent that learns from experience. Fork of opencode.",
   "private": true,
   "type": "module",

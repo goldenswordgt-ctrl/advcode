@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "advcode",
+  "name": "@advcode/cli",
   "version": "1.18.26",
   "type": "module",
   "license": "MIT",
