@@ -129,10 +129,10 @@ async function showRemovalSummary(targets: RemovalTargets, method: Installation.
 
   if (method !== "curl" && method !== "unknown") {
     const cmds: Record<string, string> = {
-      npm: "npm uninstall -g advcode-ai",
-      pnpm: "pnpm uninstall -g advcode-ai",
-      bun: "bun remove -g advcode-ai",
-      yarn: "yarn global remove advcode-ai",
+      npm: "npm uninstall -g advcode",
+      pnpm: "pnpm uninstall -g advcode",
+      bun: "bun remove -g advcode",
+      yarn: "yarn global remove advcode",
       brew: "brew uninstall advcode",
       choco: "choco uninstall advcode",
       scoop: "scoop uninstall advcode",
@@ -180,10 +180,10 @@ async function executeUninstall(method: Installation.Method, targets: RemovalTar
 
   if (method !== "curl" && method !== "unknown") {
     const cmds: Record<string, string[]> = {
-      npm: ["npm", "uninstall", "-g", "advcode-ai"],
-      pnpm: ["pnpm", "uninstall", "-g", "advcode-ai"],
-      bun: ["bun", "remove", "-g", "advcode-ai"],
-      yarn: ["yarn", "global", "remove", "advcode-ai"],
+      npm: ["npm", "uninstall", "-g", "advcode"],
+      pnpm: ["pnpm", "uninstall", "-g", "advcode"],
+      bun: ["bun", "remove", "-g", "advcode"],
+      yarn: ["yarn", "global", "remove", "advcode"],
       brew: ["brew", "uninstall", "advcode"],
       choco: ["choco", "uninstall", "advcode"],
       scoop: ["scoop", "uninstall", "advcode"],

@@ -199,7 +199,7 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
           const installedNames =
             check.name === "brew" || check.name === "choco" || check.name === "scoop"
               ? ["opencode"]
-              : ["advcode-ai", "@advcode/cli"]
+              : ["advcode", "@advcode/cli"]
           if (installedNames.some((name) => output.includes(name))) {
             return check.name
           }
@@ -229,7 +229,7 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
         if (detectedMethod === "npm" || detectedMethod === "bun" || detectedMethod === "pnpm") {
           const response = yield* httpOk.execute(
             HttpClientRequest.get(
-              `${yield* NpmConfig.registry(process.cwd())}/advcode-ai/${InstallationChannel}`,
+              `${yield* NpmConfig.registry(process.cwd())}/advcode/${InstallationChannel}`,
             ).pipe(HttpClientRequest.acceptJson),
           )
           const data = yield* HttpClientResponse.schemaBodyJson(NpmPackage)(response)
@@ -271,13 +271,13 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
             upgradeResult = yield* upgradeCurl(target)
             break
           case "npm":
-            upgradeResult = yield* run(["npm", "install", "-g", `advcode-ai@${target}`])
+            upgradeResult = yield* run(["npm", "install", "-g", `advcode@${target}`])
             break
           case "pnpm":
-            upgradeResult = yield* run(["pnpm", "install", "-g", `advcode-ai@${target}`])
+            upgradeResult = yield* run(["pnpm", "install", "-g", `advcode@${target}`])
             break
           case "bun":
-            upgradeResult = yield* run(["bun", "install", "-g", `advcode-ai@${target}`])
+            upgradeResult = yield* run(["bun", "install", "-g", `advcode@${target}`])
             break
           case "brew": {
             const formula = yield* getBrewFormula()

@@ -54,7 +54,7 @@ bun run --cwd packages/advcode script/build.ts --single
 ### npm (when published)
 
 ```bash
-npm i -g advcode-ai@latest   # or bun/pnpm/yarn; @advcode/cli also ships the binary
+npm i -g advcode@latest   # or bun/pnpm/yarn; @advcode/cli also ships the binary
 ```
 
 ### Config
