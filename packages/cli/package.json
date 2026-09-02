@@ -1,11 +1,11 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "@opencode-ai/cli",
+  "name": "advcode",
   "version": "1.18.26",
   "type": "module",
   "license": "MIT",
   "bin": {
-    "lildax": "./bin/lildax.cjs"
+    "advcode": "./bin/lildax.cjs"
   },
   "files": [
     "bin"
@@ -32,5 +32,6 @@
     "@tsconfig/bun": "catalog:",
     "@types/bun": "catalog:",
     "@typescript/native-preview": "catalog:"
-  }
+  },
+  "description": "advcode \u2014 the AI coding agent that learns. Fork of opencode with memory, skills, and bot mode."
 }

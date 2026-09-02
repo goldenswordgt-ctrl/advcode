@@ -17,6 +17,16 @@ export const Plugin = define({
     const location = yield* Location.Service
     yield* ctx.skill.transform(
       Effect.fn(function* (draft) {
+        // OpenCode2: learned skills (from the learning loop) are always
+        // available — they live under <data>/skills/learned and are written
+        // as markdown with frontmatter, so the existing loader picks them
+        // up exactly like any other skill source.
+        draft.source(
+          SkillV2.DirectorySource.make({
+            type: "directory",
+            path: AbsolutePath.make(path.join(global.data, "skills", "learned")),
+          }),
+        )
         const entries = yield* config.entries()
         const directories = entries.flatMap((entry) => (entry.type === "directory" ? [entry.path] : []))
         const items = entries.flatMap((entry) => (entry.type === "document" ? (entry.info.skills ?? []) : []))

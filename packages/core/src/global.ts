@@ -1,5 +1,6 @@
 import path from "path"
 import fs from "fs/promises"
+import { existsSync } from "node:fs"
 import { xdgData, xdgCache, xdgConfig, xdgState } from "xdg-basedir"
 import os from "os"
 import { Context, Effect, Layer } from "effect"
@@ -7,10 +8,19 @@ import { Flock } from "./util/flock"
 import { Flag } from "./flag/flag"
 import { makeGlobalNode } from "./effect/app-node"
 
-const app = "opencode"
+const app = "advcode"
+// OpenCode2 → advcode rebrand: data/cache/state/tmp are fully isolated under
+// the advcode name, so sessions and the DB never touch the real opencode.
+// Config ADOPTS an existing opencode config when present (providers, auth,
+// plugins, and the big-pickle model keep working with zero setup); users
+// without opencode get their own clean ~/.config/advcode instead.
 const data = path.join(xdgData!, app)
 const cache = path.join(xdgCache!, app)
-const config = path.join(xdgConfig!, app)
+const config = existsSync(path.join(xdgConfig!, "advcode", "opencode.json"))
+  ? path.join(xdgConfig!, "advcode")
+  : existsSync(path.join(xdgConfig!, "opencode", "opencode.json"))
+    ? path.join(xdgConfig!, "opencode")
+    : path.join(xdgConfig!, "advcode")
 const state = path.join(xdgState!, app)
 const tmp = path.join(os.tmpdir(), app)
 

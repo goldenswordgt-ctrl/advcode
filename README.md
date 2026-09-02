@@ -1,129 +1,113 @@
 <p align="center">
-  <a href="https://opencode.ai">
-    <picture>
-      <source srcset="packages/console/app/src/asset/logo-ornate-dark.svg" media="(prefers-color-scheme: dark)">
-      <source srcset="packages/console/app/src/asset/logo-ornate-light.svg" media="(prefers-color-scheme: light)">
-      <img src="packages/console/app/src/asset/logo-ornate-light.svg" alt="OpenCode logo">
-    </picture>
-  </a>
+  <img src="packages/tui/src/logo.ts" alt="advcode logo" width="0" height="0" style="display:none">
 </p>
-<p align="center">The open source AI coding agent.</p>
 <p align="center">
-  <a href="https://opencode.ai/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
-  <a href="https://www.npmjs.com/package/opencode-ai"><img alt="npm" src="https://img.shields.io/npm/v/opencode-ai?style=flat-square" /></a>
-  <a href="https://github.com/anomalyco/opencode/actions/workflows/publish.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/anomalyco/opencode/publish.yml?style=flat-square&branch=dev" /></a>
+<pre>
+           ▄
+█▀▀█ █▀▀█ █__█   █▀▀▀ █▀▀█ █▀▀█ █▀▀█
+█^^█ █__█ █__█   █___ █__█ █__█ █^^^
+█__█ ▀▀▀▄ ▀~~▀   ▀▀▀▀ ▀▀▀▀ ▀▀▀▄ ▀▀▀▀
+</pre>
 </p>
 
-<p align="center">
-  <a href="README.md">English</a> |
-  <a href="README.zh.md">简体中文</a> |
-  <a href="README.zht.md">繁體中文</a> |
-  <a href="README.ko.md">한국어</a> |
-  <a href="README.de.md">Deutsch</a> |
-  <a href="README.es.md">Español</a> |
-  <a href="README.fr.md">Français</a> |
-  <a href="README.it.md">Italiano</a> |
-  <a href="README.da.md">Dansk</a> |
-  <a href="README.ja.md">日本語</a> |
-  <a href="README.pl.md">Polski</a> |
-  <a href="README.ru.md">Русский</a> |
-  <a href="README.bs.md">Bosanski</a> |
-  <a href="README.ar.md">العربية</a> |
-  <a href="README.no.md">Norsk</a> |
-  <a href="README.br.md">Português (Brasil)</a> |
-  <a href="README.th.md">ไทย</a> |
-  <a href="README.tr.md">Türkçe</a> |
-  <a href="README.uk.md">Українська</a> |
-  <a href="README.bn.md">বাংলা</a> |
-  <a href="README.gr.md">Ελληνικά</a> |
-  <a href="README.vi.md">Tiếng Việt</a>
-</p>
+<p align="center"><strong>The AI coding agent that learns from experience.</strong></p>
 
-[![OpenCode Terminal UI](packages/web/src/assets/lander/screenshot.png)](https://opencode.ai)
+<p align="center">
+  <a href="#installation"><img alt="install" src="https://img.shields.io/badge/install-git-orange?style=flat-square" /></a>
+  <a href="LICENSE"><img alt="license" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" /></a>
+</p>
 
 ---
 
-### Installation
+**advcode** is a fork of [opencode](https://github.com/anomalyco/opencode) (MIT) that grafts a **persistent brain** onto the best open-source agent CLI: distilled cross-session memory, an autonomous skill-learning loop, and bot mode for named agents that talk to each other.
+
+It keeps everything opencode is great at — providers, models, LSP, plugins, permissions, the TUI — and adds the parts that make an agent *get better over time*.
+
+## What's different
+
+| Feature | What it does |
+| ------- | ------------ |
+| 🧠 **Memory** | Distilled cross-session memory with a user model. Facts, decisions, preferences, and lessons survive between sessions — stored in SQLite, queryable by the agent. |
+| 📖 **Skill learning** | After completing tasks, advcode serializes reusable procedures into `SKILL.md` files it writes itself. Skills are living documents, patched when a better approach is found. |
+| 📚 **Learned skills directory** | Learned skills live in `<data>/skills/learned` and are auto-discovered — no config, no restart. |
+| 🤖 **Bot mode** | Named agents with personas, avatars, and their own model config. They can post messages to each other — a group chat for your army of agents. |
+| 🔪 **Zero setup adoption** | If you already have opencode config, advcode adopts it: your providers, auth, plugins, and models (including big-pickle) work immediately. Its *data* is fully isolated — your real opencode sessions are never touched. |
+
+## Installation
+
+### From source (recommended for now)
 
 ```bash
-# YOLO
-curl -fsSL https://opencode.ai/install | bash
-
-# Package managers
-npm i -g opencode-ai@latest        # or bun/pnpm/yarn
-scoop install opencode             # Windows
-choco install opencode             # Windows
-brew install anomalyco/tap/opencode # macOS and Linux (recommended, always up to date)
-brew install opencode              # macOS and Linux (official brew formula, updated less)
-sudo pacman -S opencode            # Arch Linux (Stable)
-paru -S opencode-bin               # Arch Linux (Latest from AUR)
-mise use -g opencode               # Any OS
-nix run nixpkgs#opencode           # or github:anomalyco/opencode for latest dev branch
+git clone https://github.com/goldenswordgt-ctrl/advcode.git
+cd advcode
+bun install
+bun run --cwd packages/advcode src/index.ts
 ```
 
-> [!TIP]
-> Remove versions older than 0.1.x before installing.
-
-### Desktop App (BETA)
-
-OpenCode is also available as a desktop application. Download directly from the [releases page](https://github.com/anomalyco/opencode/releases) or [opencode.ai/download](https://opencode.ai/download).
-
-| Platform              | Download                           |
-| --------------------- | ---------------------------------- |
-| macOS (Apple Silicon) | `opencode-desktop-mac-arm64.dmg`   |
-| macOS (Intel)         | `opencode-desktop-mac-x64.dmg`     |
-| Windows               | `opencode-desktop-windows-x64.exe` |
-| Linux                 | `.deb`, `.rpm`, or `.AppImage`     |
+Or build a single-platform binary:
 
 ```bash
-# macOS (Homebrew)
-brew install --cask opencode-desktop
-# Windows (Scoop)
-scoop bucket add extras; scoop install extras/opencode-desktop
+bun run --cwd packages/advcode script/build.ts --single
+# binary at packages/advcode/dist/advcode-<platform>-<arch>/bin/advcode
 ```
 
-#### Installation Directory
-
-The install script respects the following priority order for the installation path:
-
-1. `$OPENCODE_INSTALL_DIR` - Custom installation directory
-2. `$XDG_BIN_DIR` - XDG Base Directory Specification compliant path
-3. `$HOME/bin` - Standard user binary directory (if it exists or can be created)
-4. `$HOME/.opencode/bin` - Default fallback
+### npm (when published)
 
 ```bash
-# Examples
-OPENCODE_INSTALL_DIR=/usr/local/bin curl -fsSL https://opencode.ai/install | bash
-XDG_BIN_DIR=$HOME/.local/bin curl -fsSL https://opencode.ai/install | bash
+npm i -g advcode@latest   # or bun/pnpm/yarn
 ```
 
-### Agents
+### Config
 
-OpenCode includes two built-in agents you can switch between with the `Tab` key.
+- **Config:** adopts `~/.config/opencode` if present, else `~/.config/advcode`
+- **Data (sessions, memory DB):** `~/.local/share/advcode` — never touches opencode's data
+- **Cache:** `~/.cache/advcode`
 
-- **build** - Default, full-access agent for development work
-- **plan** - Read-only agent for analysis and code exploration
-  - Denies file edits by default
-  - Asks permission before running bash commands
-  - Ideal for exploring unfamiliar codebases or planning changes
+## The learning loop
 
-Also included is a **general** subagent for complex searches and multistep tasks.
-This is used internally and can be invoked using `@general` in messages.
+1. You complete a task with the agent.
+2. If the task involved enough steps (tool calls, error recovery, corrections), advcode distills the reusable procedure into a skill.
+3. The next time a similar task comes up, the skill is loaded automatically and the agent is faster and more accurate.
+4. Skills get patched in place when you find a better way, and can be removed or improved.
 
-Learn more about [agents](https://opencode.ai/docs/agents).
+This is the same "self-improvement loop" idea as Hermes (Nous Research) — an agent that compounds its own competence.
 
-### Documentation
+## Bot mode
 
-For more info on how to configure OpenCode, [**head over to our docs**](https://opencode.ai/docs).
+```ts
+// in a plugin or config
+BotMode.register({ name: "reviewer", persona: "ruthless code reviewer", avatar: "🦅" })
+BotMode.post("reviewer", "channel", "someone pushed to main, go read the diff")
+```
 
-### Contributing
+Bots are full agents — they can be assigned work, reply into channels, and their messages are stored in the same SQLite DB.
 
-If you're interested in contributing to OpenCode, please read our [contributing docs](./CONTRIBUTING.md) before submitting a pull request.
+## Memory service
 
-### Building on OpenCode
+```ts
+MemoryV2.remember({ type: "preference", key: "editor", value: "neovim", importance: 0.7 })
+MemoryV2.recallTop({ types: ["preference", "decision"], limit: 10 })
+MemoryV2.rememberUser({ key: "name", value: "Oliver" })
+```
 
-If you are working on a project that's related to OpenCode and is using "opencode" as part of its name, for example "opencode-dashboard" or "opencode-mobile", please add a note to your README to clarify that it is not built by the OpenCode team and is not affiliated with us in any way.
+Memories are typed (`user | project | workflow | preference | decision | lesson`), weighted by importance, and independently queryable.
 
----
+## Roadmap
 
-**Join our community** [Discord](https://discord.gg/opencode) | [X.com](https://x.com/opencode)
+See [specs/feature-harvest.md](specs/feature-harvest.md) for the full harvest of best-in-class abilities from Hermes, Claude Code, Aider, Codex, Gemini CLI, Cursor, and others. Priorities:
+
+- [ ] Durable background subagents + background bash (fire-and-forget agents)
+- [ ] Progressive disclosure for skills (hundreds of skills at ~630 tokens)
+- [ ] Hooks with exit-code contract
+- [ ] Repo map with graph ranking (Aider-style)
+- [ ] Checkpoints/rewind + worktree isolation
+- [ ] Sandbox modes (Codex-style OS-level enforcement)
+- [ ] Eval harness (SWE-bench + Terminal-Bench)
+
+## Credits
+
+Built on [opencode](https://github.com/anomalyco/opencode) — the open-source AI coding agent, MIT licensed. Feature ideas harvested from [Hermes](https://github.com/NousResearch/hermes-agent), Claude Code, Aider, OpenAI Codex, Gemini CLI, Cursor, and others.
+
+## License
+
+MIT — see [LICENSE](LICENSE). Upstream opencode retains its copyright; advcode is an independent fork.

@@ -29,6 +29,9 @@ import { SessionRunnerModel } from "./session/runner/model"
 import { SessionTodo } from "./session/todo"
 import { SkillV2 } from "./skill"
 import { SkillGuidance } from "./skill/guidance"
+import { SkillLearning } from "./skill/learning"
+import { MemoryV2 } from "./memory/memory"
+import { BotMode } from "./bot/bot"
 import { Snapshot } from "./snapshot"
 import { SystemContextBuiltIns } from "./system-context/builtins"
 import { SystemContextRegistry } from "./system-context/registry"
@@ -58,6 +61,10 @@ export const locationServices = LayerNode.group([
   Watcher.node,
   Pty.node,
   SkillV2.node,
+  SkillLearning.node,
+  MemoryV2.node,
+  BotMode.node,
+  SkillGuidance.node,
   SystemContextRegistry.node,
   SystemContextBuiltIns.node,
   LocationMutation.node,
@@ -67,7 +74,6 @@ export const locationServices = LayerNode.group([
   ToolRegistry.node,
   ToolRegistry.toolsNode,
   Image.node,
-  SkillGuidance.node,
   ReferenceGuidance.node,
   SessionTodo.node,
   QuestionV2.node,

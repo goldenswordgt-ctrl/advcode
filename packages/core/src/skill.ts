@@ -1,4 +1,5 @@
 export * as SkillV2 from "./skill"
+export * as SkillLearning from "./skill/learning"
 
 import { makeLocationNode } from "./effect/app-node"
 import path from "path"
@@ -106,13 +107,17 @@ const layer = Layer.effect(
 
     // QUESTION(Dax): Should local skill sources invalidate on filesystem watch
     // events, following the reload policy chosen for other context sources?
+    // OpenCode2: directory sources (including the learned-skills dir) are
+    // cheap local globs — don't cache them so newly learned skills appear
+    // immediately. URL sources keep the cache (network cost).
     const cache = new Map<string, Info[]>()
     const list = Effect.fn("SkillV2.list")(function* () {
       const skills = new Map<string, Info>()
       for (const source of state.get().sources) {
         const key = Source.key(source)
-        const loaded = cache.get(key) ?? (yield* load(source))
-        cache.set(key, loaded)
+        const loaded =
+          source.type === "directory" ? yield* load(source) : (cache.get(key) ?? (yield* load(source)))
+        if (source.type !== "directory") cache.set(key, loaded)
         for (const skill of loaded) skills.set(skill.name, skill)
       }
       return Array.from(skills.values())
