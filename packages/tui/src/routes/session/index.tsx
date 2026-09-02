@@ -53,6 +53,8 @@ import { DialogTimeline } from "./dialog-timeline"
 import { DialogForkFromTimeline } from "./dialog-fork-from-timeline"
 import { DialogSessionRename } from "../../component/dialog-session-rename"
 import { Sidebar } from "./sidebar"
+import { OptionsBar } from "./options-bar"
+import { createPanelState, PanelProvider } from "./panel"
 import { SubagentFooter } from "./subagent-footer.tsx"
 import { filetype } from "../../util/filetype"
 import parsers from "../../parsers-config"
@@ -1119,6 +1121,90 @@ export function Session() {
     bindings: tuiConfig.keybinds.get("session.background"),
   }))
 
+  const panel = createPanelState()
+
+  const panelBindingCommands = [
+    "session.panel.chat",
+    "session.panel.files",
+    "session.panel.mcp",
+    "session.panel.lsp",
+    "session.panel.todo",
+    "session.panel.context",
+  ]
+
+  const panelCommands = [
+    {
+      name: "session.panel.chat",
+      title: "Focus chat panel",
+      category: "Session",
+      run() {
+        panel.select(1)
+      },
+    },
+    {
+      name: "session.panel.files",
+      title: "Focus files panel",
+      category: "Session",
+      run() {
+        panel.select(2)
+      },
+    },
+    {
+      name: "session.panel.mcp",
+      title: "Focus MCP panel",
+      category: "Session",
+      run() {
+        panel.select(3)
+      },
+    },
+    {
+      name: "session.panel.lsp",
+      title: "Focus LSP panel",
+      category: "Session",
+      run() {
+        panel.select(4)
+      },
+    },
+    {
+      name: "session.panel.todo",
+      title: "Focus todo panel",
+      category: "Session",
+      run() {
+        panel.select(5)
+      },
+    },
+    {
+      name: "session.panel.context",
+      title: "Focus context panel",
+      category: "Session",
+      run() {
+        panel.select(6)
+      },
+    },
+  ]
+
+  useBindings(() => ({
+    enabled: () => renderer.currentFocusedEditor === null,
+    commands: panelCommands,
+    bindings: tuiConfig.keybinds.gather("session.panel", panelBindingCommands),
+  }))
+
+  // Keep the prompt's focus in sync with the focused panel: sidebar focus
+  // blurs the prompt so the number keys switch panels instead of typing.
+  // The prompt's own auto-refocus effect only reruns when `visible` or the
+  // dialog stack changes, so a blur here sticks until we flip back to chat.
+  createEffect(
+    on(
+      () => panel.focus(),
+      (focused) => {
+        const input = promptRef.current
+        if (!input) return
+        if (focused === "sidebar") input.blur()
+        else input.focus()
+      },
+    ),
+  )
+
   const revertInfo = createMemo(() => session()?.revert)
   const revertMessageID = createMemo(() => revertInfo()?.messageID)
   const revertMessageIndex = createMemo(() => {
@@ -1174,8 +1260,30 @@ export function Session() {
           tui: tuiConfig,
         }}
       >
-        <box flexDirection="row" flexGrow={1} minHeight={0}>
-          <box flexGrow={1} minHeight={0} paddingBottom={1} paddingLeft={2} paddingRight={2} gap={1}>
+        <PanelProvider value={panel}>
+        <box flexDirection="column" flexGrow={1} minHeight={0}>
+          <box flexDirection="row" flexGrow={1} minHeight={0}>
+            <Show when={sidebarVisible()}>
+              <Switch>
+                <Match when={wide()}>
+                  <Sidebar sessionID={route.sessionID} />
+                </Match>
+                <Match when={!wide()}>
+                  <box
+                    position="absolute"
+                    top={0}
+                    left={0}
+                    right={0}
+                    bottom={0}
+                    alignItems="flex-start"
+                    backgroundColor={RGBA.fromInts(0, 0, 0, 70)}
+                  >
+                    <Sidebar sessionID={route.sessionID} />
+                  </box>
+                </Match>
+              </Switch>
+            </Show>
+            <box flexGrow={1} minHeight={0} paddingBottom={1} paddingLeft={2} paddingRight={2} gap={1}>
             <Show when={session()}>
               <scrollbox
                 ref={(r) => (scroll = r)}
@@ -1335,27 +1443,10 @@ export function Session() {
             </Show>
             <Toast />
           </box>
-          <Show when={sidebarVisible()}>
-            <Switch>
-              <Match when={wide()}>
-                <Sidebar sessionID={route.sessionID} />
-              </Match>
-              <Match when={!wide()}>
-                <box
-                  position="absolute"
-                  top={0}
-                  left={0}
-                  right={0}
-                  bottom={0}
-                  alignItems="flex-end"
-                  backgroundColor={RGBA.fromInts(0, 0, 0, 70)}
-                >
-                  <Sidebar sessionID={route.sessionID} />
-                </box>
-              </Match>
-            </Switch>
-          </Show>
         </box>
+        <OptionsBar />
+      </box>
+    </PanelProvider>
       </context.Provider>
     </LocationProvider>
   )

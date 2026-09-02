@@ -55,7 +55,7 @@ const tui: TuiPlugin = async (api) => {
   api.slots.register({
     order: 500,
     slots: {
-      sidebar_content(_ctx, props) {
+      sidebar_files(_ctx, props) {
         return <View api={api} session_id={props.session_id} />
       },
     },

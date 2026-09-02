@@ -1,20 +1,23 @@
 import { useProject } from "../../context/project"
 import { useSync } from "../../context/sync"
-import { createMemo, Show } from "solid-js"
+import { createMemo, For, Show } from "solid-js"
 import { useTheme } from "../../context/theme"
 import { useTuiConfig } from "../../config"
 import { InstallationChannel, InstallationVersion } from "@opencode-ai/core/installation/version"
 import { usePluginRuntime } from "../../plugin/runtime"
+import { RGBA, TextAttributes } from "@opentui/core"
 
 import { getScrollAcceleration } from "../../util/scroll"
 import { WorkspaceLabel } from "../../component/workspace-label"
+import { PANELS, usePanel, type PanelDefinition } from "./panel"
 
-export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
+export function Sidebar(props: { sessionID: string; overlay?: boolean; scrollRef?: (el: { scrollBy(delta: number): void }) => void }) {
   const pluginRuntime = usePluginRuntime()
   const project = useProject()
   const sync = useSync()
   const { theme } = useTheme()
   const tuiConfig = useTuiConfig()
+  const panel = usePanel()
   const session = createMemo(() => sync.session.get(props.sessionID))
   const workspace = () => {
     const workspaceID = session()?.workspaceID
@@ -22,6 +25,9 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
     return project.workspace.get(workspaceID)
   }
   const scrollAcceleration = createMemo(() => getScrollAcceleration(tuiConfig))
+
+  const activePanel = panel.activePanel
+  const focused = () => panel.focus() === "sidebar"
 
   return (
     <Show when={session()}>
@@ -31,13 +37,19 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
         height="100%"
         paddingTop={1}
         paddingBottom={1}
-        paddingLeft={2}
-        paddingRight={2}
+        paddingLeft={1}
+        paddingRight={1}
         position={props.overlay ? "absolute" : "relative"}
+        onMouseDown={(e) => {
+          e.stopPropagation()
+          panel.focusSidebar()
+        }}
       >
+        <PanelTabs active={activePanel()} onSelect={(index) => panel.select(index)} />
         <scrollbox
           flexGrow={1}
           scrollAcceleration={scrollAcceleration()}
+          ref={(el) => props.scrollRef?.(el)}
           verticalScrollbarOptions={{
             trackOptions: {
               backgroundColor: theme.background,
@@ -82,7 +94,12 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
                 </Show>
               </box>
             </pluginRuntime.Slot>
-            <pluginRuntime.Slot name="sidebar_content" session_id={props.sessionID} />
+            <Show when={activePanel().slot}>
+              {(slotName) => <pluginRuntime.Slot name={slotName()} session_id={props.sessionID} />}
+            </Show>
+            <Show when={activePanel().id === "chat"}>
+              <pluginRuntime.Slot name="sidebar_content" session_id={props.sessionID} />
+            </Show>
           </box>
         </scrollbox>
 
@@ -99,5 +116,39 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
         </box>
       </box>
     </Show>
+  )
+}
+
+type PanelTabsProps = {
+  active: PanelDefinition
+  onSelect: (index: number) => void
+}
+
+function PanelTabs(props: PanelTabsProps) {
+  const { theme } = useTheme()
+  return (
+    <box flexShrink={0} flexDirection="row" gap={0} alignItems="center">
+      <For each={PANELS}>
+        {(panel) => {
+          const isActive = () => props.active.id === panel.id
+          return (
+            <box
+              onMouseUp={(e) => {
+                e.stopPropagation()
+                props.onSelect(panel.index)
+              }}
+              paddingLeft={1}
+              paddingRight={1}
+              backgroundColor={isActive() ? theme.borderActive : RGBA.fromInts(0, 0, 0, 0)}
+            >
+              <text fg={isActive() ? theme.text : theme.textMuted} attributes={isActive() ? TextAttributes.BOLD : undefined}>
+                {panel.index}
+              </text>
+              <text fg={isActive() ? theme.text : theme.textMuted}>{panel.title}</text>
+            </box>
+          )
+        }}
+      </For>
+    </box>
   )
 }
