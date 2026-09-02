@@ -16,7 +16,7 @@
     "dev:temporary": "bun run ./src/temporary.ts"
   },
   "bin": {
-    "advcode": "./bin/opencode"
+    "advcode": "./bin/advcode"
   },
   "exports": {
     "./*": "./src/*.ts"

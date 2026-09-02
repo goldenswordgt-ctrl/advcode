@@ -121,7 +121,7 @@ function findBinary(startDir) {
 const resolved = envPath || (fs.existsSync(cached) ? cached : findBinary(scriptDir))
 if (!resolved) {
   console.error(
-    "It seems that your package manager failed to install the right lildax CLI package. Try manually installing " +
+    "It seems that your package manager failed to install the right advcode CLI package. Try manually installing " +
       names.map((name) => `"${name}"`).join(" or ") +
       " package",
   )

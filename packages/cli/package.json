@@ -33,5 +33,5 @@
     "@types/bun": "catalog:",
     "@typescript/native-preview": "catalog:"
   },
-  "description": "advcode \u2014 the AI coding agent that learns. Fork of opencode with memory, skills, and bot mode."
+  "description": "advcode — the AI coding agent that learns. Fork of opencode with memory, skills, and bot mode."
 }
