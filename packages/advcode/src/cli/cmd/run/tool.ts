@@ -30,6 +30,7 @@ import type { ReadTool } from "@/tool/read"
 import type { SkillTool } from "@/tool/skill"
 import type { TaskTool } from "@/tool/task"
 import type { TodoWriteTool } from "@/tool/todo"
+import type { BrowserTool } from "@/tool/browser"
 import type { WebFetchTool } from "@/tool/webfetch"
 import { webSearchProviderLabel, type WebSearchTool } from "@/tool/websearch"
 import type { WriteTool } from "@/tool/write"
@@ -109,6 +110,7 @@ type ToolDefs = {
   webfetch: typeof WebFetchTool
   websearch: typeof WebSearchTool
   skill: typeof SkillTool
+  browser: typeof BrowserTool
   plan_exit: typeof PlanExitTool
 }
 
@@ -397,6 +399,19 @@ function runSkill(p: ToolProps<typeof SkillTool>): ToolInline {
   return {
     icon: "→",
     title: `Skill "${p.input.name ?? ""}"`,
+  }
+}
+
+function runBrowser(p: ToolProps<typeof BrowserTool>): ToolInline {
+  const hostname = p.input.url ? new URL(p.input.url).hostname : "unknown"
+  const hasVideo = !!p.metadata.videoPath
+  const hasEval = !!p.input.evaluate
+  const parts: string[] = [`Browser ${hostname}`]
+  if (hasEval) parts.push(`eval → ${JSON.stringify(p.metadata.output)}`)
+  if (hasVideo) parts.push(`${p.metadata.frames} frames, ${p.metadata.seconds}s`)
+  return {
+    icon: "◎",
+    title: parts.join(" · "),
   }
 }
 
@@ -1218,6 +1233,13 @@ const TOOL_RULES = {
     scroll: {
       start: scrollSkillStart,
     },
+  },
+  browser: {
+    view: {
+      output: true,
+      final: false,
+    },
+    run: runBrowser,
   },
   plan_exit: {
     view: {
