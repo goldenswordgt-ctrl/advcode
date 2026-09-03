@@ -55,6 +55,9 @@ describe("SkillGuidance", () => {
           "    <name>effect</name>",
           "    <description>Build applications with Effect</description>",
           "  </skill>",
+          "  <skill>",
+          "    <name>hidden</name>",
+          "  </skill>",
           "</available_skills>",
         ].join("\n"),
       )
@@ -140,5 +143,31 @@ describe("SkillGuidance", () => {
         snapshot: {},
       })
     }).pipe(Effect.provide(layer(() => [effect])))
+  })
+
+  it.effect("truncates a large skill set to the token budget with a discoverability hint", () => {
+    const agent = AgentV2.Info.make({ ...AgentV2.Info.empty(build) })
+    // Enough long-description skills to overflow the default budget.
+    const many = Array.from({ length: 200 }, (_, i) =>
+      SkillV2.Info.make({
+        name: `skill-${String(i).padStart(3, "0")}`,
+        description: `A deliberately long description for skill number ${i} that occupies many characters so the index must be truncated to stay under the token budget.`,
+        location: AbsolutePath.make(path.resolve(`/skills/skill-${i}/SKILL.md`)),
+        content: "guidance",
+      }),
+    )
+    return Effect.gen(function* () {
+      const guidance = yield* SkillGuidance.Service
+      const baseline = (
+        yield* guidance.load({ id: agent.id, info: agent }).pipe(Effect.flatMap(SystemContext.initialize))
+      ).baseline
+
+      // The index lists some skills but cannot list all 200 under budget.
+      expect(baseline).toContain("<available_skills>")
+      expect(baseline).toContain("more skills available")
+      expect(baseline.split("<name>").length).toBeLessThan(200)
+      // The earliest (alphabetically) skills survive; later ones are cut.
+      expect(baseline).toContain("<name>skill-000</name>")
+    }).pipe(Effect.provide(layer(() => many)))
   })
 })
