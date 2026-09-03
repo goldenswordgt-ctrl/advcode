@@ -53,6 +53,8 @@ import { DialogTimeline } from "./dialog-timeline"
 import { DialogForkFromTimeline } from "./dialog-fork-from-timeline"
 import { DialogSessionRename } from "../../component/dialog-session-rename"
 import { Sidebar } from "./sidebar"
+import { BackgroundPanel } from "./background-panel"
+import { SystemMonitorPanel } from "./system-monitor-panel"
 import { OptionsBar } from "./options-bar"
 import { createPanelState, PanelProvider } from "./panel"
 import { SubagentFooter } from "./subagent-footer.tsx"
@@ -1266,7 +1268,14 @@ export function Session() {
             <Show when={sidebarVisible()}>
               <Switch>
                 <Match when={wide()}>
-                  <Sidebar sessionID={route.sessionID} />
+                  <box flexDirection="column" width={42} minHeight={0} backgroundColor={theme.backgroundPanel}>
+                    <SystemMonitorPanel />
+                    <box flexShrink={0} paddingLeft={1} paddingRight={1} paddingTop={1}>
+                      <text fg={theme.textMuted}>─── Dashboard ───</text>
+                    </box>
+                    <BackgroundPanel sessionID={route.sessionID} workspace={project.workspace.current()} />
+                    <Sidebar sessionID={route.sessionID} />
+                  </box>
                 </Match>
                 <Match when={!wide()}>
                   <box
@@ -1278,7 +1287,11 @@ export function Session() {
                     alignItems="flex-start"
                     backgroundColor={RGBA.fromInts(0, 0, 0, 70)}
                   >
-                    <Sidebar sessionID={route.sessionID} />
+                    <box flexDirection="column" width={42} minHeight={0} backgroundColor={theme.backgroundPanel}>
+                      <SystemMonitorPanel />
+                      <BackgroundPanel sessionID={route.sessionID} workspace={project.workspace.current()} />
+                      <Sidebar sessionID={route.sessionID} />
+                    </box>
                   </box>
                 </Match>
               </Switch>

@@ -29,6 +29,8 @@ import type {
   EventTuiPromptAppend,
   EventTuiSessionSelect,
   EventTuiToastShow,
+  ExperimentalBackgroundListErrors,
+  ExperimentalBackgroundListResponses,
   ExperimentalCapabilitiesGetErrors,
   ExperimentalCapabilitiesGetResponses,
   ExperimentalConsoleGetErrors,
@@ -922,6 +924,42 @@ export class Resource extends HeyApiClient {
   }
 }
 
+export class Background extends HeyApiClient {
+  /**
+   * List background jobs
+   *
+   * Get a list of detached background subagent jobs for this instance, newest first. Only jobs launched in the background are included.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      ExperimentalBackgroundListResponses,
+      ExperimentalBackgroundListErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/background",
+      ...options,
+      ...params,
+    })
+  }
+}
+
 export class ProjectCopy extends HeyApiClient {
   /**
    * Generate project copy name
@@ -1264,6 +1302,11 @@ export class Experimental extends HeyApiClient {
   private _resource?: Resource
   get resource(): Resource {
     return (this._resource ??= new Resource({ client: this.client }))
+  }
+
+  private _background?: Background
+  get background(): Background {
+    return (this._background ??= new Background({ client: this.client }))
   }
 
   private _projectCopy?: ProjectCopy

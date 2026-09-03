@@ -2254,6 +2254,22 @@ export type McpResource = {
   client: string
 }
 
+export type BackgroundJobInfo = {
+  id: string
+  type: string
+  title?: string
+  status: "running" | "completed" | "error" | "cancelled"
+  started_at: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  completed_at?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  output?: string
+  error?: string
+  metadata?: {
+    [key: string]: unknown
+  }
+}
+
+export type BackgroundJobList = Array<BackgroundJobInfo>
+
 export type Symbol = {
   name: string
   kind: number
@@ -7888,6 +7904,35 @@ export type ExperimentalResourceListResponses = {
 
 export type ExperimentalResourceListResponse =
   ExperimentalResourceListResponses[keyof ExperimentalResourceListResponses]
+
+export type ExperimentalBackgroundListData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/background"
+}
+
+export type ExperimentalBackgroundListErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ExperimentalBackgroundListError = ExperimentalBackgroundListErrors[keyof ExperimentalBackgroundListErrors]
+
+export type ExperimentalBackgroundListResponses = {
+  /**
+   * Background jobs
+   */
+  200: BackgroundJobList
+}
+
+export type ExperimentalBackgroundListResponse =
+  ExperimentalBackgroundListResponses[keyof ExperimentalBackgroundListResponses]
 
 export type FindTextData = {
   body?: never

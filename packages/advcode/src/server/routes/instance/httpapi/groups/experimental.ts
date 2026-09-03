@@ -60,6 +60,25 @@ export const ToolListQuery = Schema.Struct({
   model: ModelV2.ID,
 })
 
+const BackgroundJobInfo = Schema.Struct({
+  id: Schema.String,
+  type: Schema.String,
+  title: Schema.optional(Schema.String),
+  status: Schema.Union([
+    Schema.Literal("running"),
+    Schema.Literal("completed"),
+    Schema.Literal("error"),
+    Schema.Literal("cancelled"),
+  ]),
+  started_at: Schema.Number,
+  completed_at: Schema.optional(Schema.Number),
+  output: Schema.optional(Schema.String),
+  error: Schema.optional(Schema.String),
+  metadata: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
+}).annotate({ identifier: "BackgroundJobInfo" })
+
+const BackgroundJobList = Schema.Array(BackgroundJobInfo).annotate({ identifier: "BackgroundJobList" })
+
 const WorktreeList = Schema.Array(Schema.String)
 const WorktreeErrorName = Schema.Union([
   Schema.Literal("WorktreeNotGitError"),
@@ -98,6 +117,7 @@ export const ExperimentalPaths = {
   worktreeReset: "/experimental/worktree/reset",
   session: "/experimental/session",
   sessionBackground: "/experimental/session/:sessionID/background",
+  background: "/experimental/background",
   resource: "/experimental/resource",
 } as const
 
@@ -253,6 +273,17 @@ export const ExperimentalApi = HttpApi.make("experimental")
             identifier: "experimental.resource.list",
             summary: "Get MCP resources",
             description: "Get all available MCP resources from connected servers. Optionally filter by name.",
+          }),
+        ),
+        HttpApiEndpoint.get("background", ExperimentalPaths.background, {
+          query: WorkspaceRoutingQuery,
+          success: described(BackgroundJobList, "Background jobs"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.background.list",
+            summary: "List background jobs",
+            description:
+              "Get a list of detached background subagent jobs for this instance, newest first. Only jobs launched in the background are included.",
           }),
         ),
       )
