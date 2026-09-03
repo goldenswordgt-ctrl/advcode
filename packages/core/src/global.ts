@@ -8,12 +8,10 @@ import { Flock } from "./util/flock"
 import { Flag } from "./flag/flag"
 import { makeGlobalNode } from "./effect/app-node"
 
-const app = "advcode"
-// OpenCode2 → advcode rebrand: data/cache/state/tmp are fully isolated under
-// the advcode name, so sessions and the DB never touch the real opencode.
-// Config ADOPTS an existing opencode config when present (providers, auth,
-// plugins, and the big-pickle model keep working with zero setup); users
-// without opencode get their own clean ~/.config/advcode instead.
+const app = "opencode"
+// ADVCode shares the opencode data/cache/state/tmp dirs so sessions, the DB,
+// auth, and caches are one source of truth across opencode, advcode, Zen, and
+// Go. The visible product branding stays "opencode" for Zen/Go.
 const data = path.join(xdgData!, app)
 const cache = path.join(xdgCache!, app)
 const config = existsSync(path.join(xdgConfig!, "advcode", "opencode.json"))
