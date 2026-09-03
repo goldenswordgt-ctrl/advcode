@@ -32,6 +32,12 @@ import { MemoryCommand } from "./cli/cmd/memory"
 import { SkillCommand } from "./cli/cmd/skill"
 import { BotCommand } from "./cli/cmd/bot"
 import { LearnCommand } from "./cli/cmd/learn"
+import { BtwCommand } from "./cli/cmd/btw"
+import { GoalCommand } from "./cli/cmd/goal"
+import { ObserveCommand } from "./cli/cmd/observe"
+import { ScheduleCommand } from "./cli/cmd/schedule"
+import { LogCommand } from "./cli/cmd/log"
+import { BrowserCommand } from "./cli/cmd/browser"
 import { CurateCommand } from "./cli/cmd/curate"
 import { Heap } from "./cli/heap"
 
@@ -109,8 +115,14 @@ const cli = yargs(args)
   .command(SkillCommand)
   .command(BotCommand)
   .command(LearnCommand)
-  .command(CurateCommand)
+  .command(BtwCommand)
+  .command(GoalCommand)
+  .command(ObserveCommand)
+  .command(ScheduleCommand)
   .command(DbCommand)
+  .command(LogCommand)
+  .command(BrowserCommand)
+  .command(CurateCommand)
   .fail((msg, err) => {
     if (
       msg?.startsWith("Unknown argument") ||
