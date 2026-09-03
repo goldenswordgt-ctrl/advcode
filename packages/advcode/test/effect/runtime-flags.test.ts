@@ -371,4 +371,75 @@ describe("RuntimeFlags", () => {
       expect(flags.disableClaudeCodeSkills).toBe(true)
     }),
   )
+
+  it.effect("lightweight defaults to false", () =>
+    Effect.gen(function* () {
+      const flags = yield* readFlags.pipe(Effect.provide(fromConfig({})))
+
+      expect(flags.lightweight).toBe(false)
+    }),
+  )
+
+  it.effect("lightweight reads OPENCODE_LIGHTWEIGHT", () =>
+    Effect.gen(function* () {
+      const flags = yield* readFlags.pipe(Effect.provide(fromConfig({ OPENCODE_LIGHTWEIGHT: "true" })))
+
+      expect(flags.lightweight).toBe(true)
+    }),
+  )
+
+  it.effect("node folds heavy-subsystem disables when lightweight is on", () =>
+    Effect.gen(function* () {
+      const flags = yield* readFlags.pipe(Effect.provide(fromConfig({ OPENCODE_LIGHTWEIGHT: "true" })))
+
+      expect(flags.lightweight).toBe(true)
+      expect(flags.pure).toBe(true)
+      expect(flags.disableEmbeddedWebUi).toBe(true)
+      expect(flags.disableExternalSkills).toBe(true)
+      expect(flags.disableLspDownload).toBe(true)
+      expect(flags.disableClaudeCodeSkills).toBe(true)
+      expect(flags.experimentalBackgroundSubagents).toBe(false)
+      expect(flags.experimentalLspTool).toBe(false)
+    }),
+  )
+
+  it.effect("node keeps heavy subsystems enabled when lightweight is off", () =>
+    Effect.gen(function* () {
+      const flags = yield* readFlags.pipe(Effect.provide(fromConfig({})))
+
+      expect(flags.disableEmbeddedWebUi).toBe(false)
+      expect(flags.disableExternalSkills).toBe(false)
+      expect(flags.disableLspDownload).toBe(false)
+      expect(flags.experimentalBackgroundSubagents).toBe(true)
+    }),
+  )
+
+  it.effect("test layer applies the lightweight fold", () =>
+    Effect.gen(function* () {
+      const flags = yield* readFlags.pipe(Effect.provide(RuntimeFlags.layer({ lightweight: true })))
+
+      expect(flags.lightweight).toBe(true)
+      expect(flags.pure).toBe(true)
+      expect(flags.disableEmbeddedWebUi).toBe(true)
+      expect(flags.disableExternalSkills).toBe(true)
+      expect(flags.disableLspDownload).toBe(true)
+      expect(flags.disableClaudeCodeSkills).toBe(true)
+      expect(flags.experimentalBackgroundSubagents).toBe(false)
+      expect(flags.experimentalLspTool).toBe(false)
+    }),
+  )
+
+  it.effect("explicit overrides win over the lightweight fold", () =>
+    Effect.gen(function* () {
+      const flags = yield* readFlags.pipe(
+        Effect.provide(RuntimeFlags.layer({ lightweight: true, disableExternalSkills: false })),
+      )
+
+      expect(flags.lightweight).toBe(true)
+      expect(flags.disableExternalSkills).toBe(false)
+      // The rest of the fold still applies.
+      expect(flags.disableEmbeddedWebUi).toBe(true)
+      expect(flags.disableLspDownload).toBe(true)
+    }),
+  )
 })

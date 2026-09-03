@@ -22,6 +22,10 @@ const backgroundSubagentsDefaultOn = () =>
 export class Service extends ConfigService.Service<Service>()("@opencode/RuntimeFlags", {
   autoShare: bool("OPENCODE_AUTO_SHARE"),
   pure: bool("OPENCODE_PURE"),
+  // Lightweight mode: one switch that disables the heavy subsystems so the
+  // agent runs acceptably on low-RAM / low-CPU hardware. Compose the existing
+  // per-subsystem flags rather than gating each wiring point individually.
+  lightweight: bool("OPENCODE_LIGHTWEIGHT"),
   disableDefaultPlugins: bool("OPENCODE_DISABLE_DEFAULT_PLUGINS"),
   disableEmbeddedWebUi: bool("OPENCODE_DISABLE_EMBEDDED_WEB_UI"),
   disableExternalSkills: bool("OPENCODE_DISABLE_EXTERNAL_SKILLS"),
@@ -64,21 +68,51 @@ export class Service extends ConfigService.Service<Service>()("@opencode/Runtime
 
 export type Info = Context.Service.Shape<typeof Service>
 
+// Lightweight mode folds the heavy-subsystem disables into one switch. Read the
+// underlying config service, apply the override set, and return the folded Info.
+const foldLightweight = (flags: Info): Info => {
+  if (!flags.lightweight) return flags
+  return {
+    ...flags,
+    pure: true,
+    disableEmbeddedWebUi: true,
+    disableExternalSkills: true,
+    disableLspDownload: true,
+    disableClaudeCodeSkills: true,
+    experimentalBackgroundSubagents: false,
+    experimentalLspTool: false,
+  }
+}
+
 const emptyConfigLayer = Service.layer.pipe(
   Layer.provide(ConfigProvider.layer(ConfigProvider.fromUnknown({}))),
   Layer.orDie,
 )
 
+/** Test overlay: parse defaults, apply the lightweight fold (if lightweight is set by config or overrides), then explicit overrides on top. */
 export const layer = (overrides: Partial<Info> = {}) =>
   Layer.effect(
     Service,
     Effect.gen(function* () {
       const flags = yield* Service
-      return Service.of({ ...flags, ...overrides })
+      const effective = { ...flags, ...overrides }
+      return Service.of({ ...foldLightweight(effective), ...overrides })
     }),
   ).pipe(Layer.provide(emptyConfigLayer))
 
-export const node = LayerNode.make({ service: Service, layer: Service.layer.pipe(Layer.orDie), deps: [] })
+// Production node: read the real env config, then apply the lightweight fold so
+// OPENCODE_LIGHTWEIGHT=1 actually reaches every subsystem gate.
+export const node = LayerNode.make({
+  service: Service,
+  layer: Layer.effect(
+    Service,
+    Effect.gen(function* () {
+      const flags = yield* Service
+      return Service.of(foldLightweight(flags))
+    }),
+  ).pipe(Layer.provide(Service.layer.pipe(Layer.orDie))),
+  deps: [],
+})
 
 export * as RuntimeFlags from "./runtime-flags"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"

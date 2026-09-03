@@ -74,11 +74,18 @@ const cli = yargs(args)
     describe: "run without external plugins",
     type: "boolean",
   })
+  .option("lightweight", {
+    describe: "low-RAM/low-CPU mode: disable background subagents, LSP, embedded UI, external skills",
+    type: "boolean",
+  })
   .middleware(async (opts) => {
     if (opts.printLogs) process.env.OPENCODE_PRINT_LOGS = "1"
     if (opts.logLevel) process.env.OPENCODE_LOG_LEVEL = opts.logLevel
     if (opts.pure) {
       process.env.OPENCODE_PURE = "1"
+    }
+    if (opts.lightweight) {
+      process.env.OPENCODE_LIGHTWEIGHT = "1"
     }
 
     Heap.start()
