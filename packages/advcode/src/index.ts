@@ -32,6 +32,7 @@ import { MemoryCommand } from "./cli/cmd/memory"
 import { SkillCommand } from "./cli/cmd/skill"
 import { BotCommand } from "./cli/cmd/bot"
 import { LearnCommand } from "./cli/cmd/learn"
+import { CurateCommand } from "./cli/cmd/curate"
 import { Heap } from "./cli/heap"
 
 const args = hideBin(process.argv)
@@ -108,6 +109,7 @@ const cli = yargs(args)
   .command(SkillCommand)
   .command(BotCommand)
   .command(LearnCommand)
+  .command(CurateCommand)
   .command(DbCommand)
   .fail((msg, err) => {
     if (

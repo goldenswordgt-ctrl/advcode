@@ -28,6 +28,7 @@ export const LearnedSkill = Schema.Struct({
   times_used: Schema.Number,
   times_improved: Schema.Number,
   time_created: Schema.Number,
+  last_used_at: Schema.optional(Schema.Number),
 })
 export type LearnedSkill = typeof LearnedSkill.Type
 
@@ -113,6 +114,7 @@ const layer = Layer.effect(
           times_used: existing[0].times_used,
           times_improved: existing[0].times_improved,
           time_created: existing[0].time_created,
+          last_used_at: existing[0].last_used_at ?? undefined,
         } satisfies LearnedSkill
       }
 
@@ -140,6 +142,7 @@ const layer = Layer.effect(
         times_used: 0,
         times_improved: 0,
         time_created: now,
+        last_used_at: undefined,
       } satisfies LearnedSkill
     })
 
@@ -161,6 +164,7 @@ const layer = Layer.effect(
         times_used: row[0].times_used,
         times_improved: row[0].times_improved,
         time_created: row[0].time_created,
+        last_used_at: row[0].last_used_at ?? undefined,
       } satisfies LearnedSkill
     })
 
@@ -180,6 +184,7 @@ const layer = Layer.effect(
         times_used: row.times_used,
         times_improved: row.times_improved,
         time_created: row.time_created,
+        last_used_at: row.last_used_at ?? undefined,
       } satisfies LearnedSkill))
     })
 

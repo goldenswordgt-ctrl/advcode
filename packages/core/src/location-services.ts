@@ -33,6 +33,7 @@ import { RepoMap } from "./repo-map/repo-map"
 import { RepoMapGuidance } from "./repo-map/guidance"
 import { SkillLearning } from "./skill/learning"
 import { SelfLearning } from "./skill/self-learn"
+import { SkillCurator } from "./skill/curator"
 import { MemoryV2 } from "./memory/memory"
 import { MemoryContext } from "./memory/context"
 import { BotMode } from "./bot/bot"
@@ -68,6 +69,7 @@ export const locationServices = LayerNode.group([
   SkillV2.node,
   SkillLearning.node,
   SelfLearning.node,
+  SkillCurator.node,
   MemoryV2.node,
   BotMode.node,
   BotRunner.node,

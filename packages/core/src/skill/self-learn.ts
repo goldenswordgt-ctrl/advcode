@@ -189,6 +189,19 @@ const layer = Layer.effect(
         if (parsed.skill) {
           const name = sanitizeSkillName(parsed.skill.name)
           if (name.length > 0) {
+            const content = parsed.skill.content ?? ""
+            const lower = content.toLowerCase()
+            const hasStructure =
+              /^##\s+/m.test(content) &&
+              (lower.includes("gotcha") ||
+                lower.includes("pitfall") ||
+                lower.includes("when to use") ||
+                lower.includes("steps"))
+            // Quality gate: skip a skill with no reusable procedure structure —
+            // procedural noise has no sections and no guidance, so it would only
+            // become dead weight the curator later has to prune.
+            if (!hasStructure) return
+
             yield* skills
               .create({
                 name,
