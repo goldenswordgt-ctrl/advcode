@@ -1497,6 +1497,7 @@ export function Prompt(props: PromptProps) {
             height={1}
             border={["bottom"]}
             borderColor={theme.backgroundElement}
+            backgroundColor={theme.backgroundElement}
             customBorderChars={
               theme.backgroundElement.a !== 0
                 ? {

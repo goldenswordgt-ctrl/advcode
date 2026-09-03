@@ -129,7 +129,7 @@ export function resolve(input: Info, options: ResolveOptions): Resolved {
     cursor: input.cursor
       ? {
           style: input.cursor.style ?? "block",
-          blinking: input.cursor.blinking ?? true,
+          blinking: input.cursor.blinking ?? false,
         }
       : undefined,
   }
