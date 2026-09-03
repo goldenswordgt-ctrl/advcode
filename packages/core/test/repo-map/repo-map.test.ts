@@ -121,4 +121,44 @@ export function main() { return new Engine() }
         }),
     ),
   )
+
+  it("caches the built map between calls under the same budget", () =>
+    runWithProject(
+      {
+        "a.ts": `export function a() {}\n`,
+        "b.ts": `export function b() {}\n`,
+      },
+      () =>
+        Effect.gen(function* () {
+          const service = yield* RepoMap.Service
+          const first = yield* service.build()
+          const second = yield* service.build()
+          expect(first).toBe(second)
+          // Same budget returns the cached string, not a rebuild.
+          expect(second).toContain("<repo_map>")
+        }),
+    ),
+  )
+
+  it("keys the cache by budget", () =>
+    runWithProject(
+      {
+        "a.ts": `export function a() {}\n`,
+        "b.ts": `export function b() {}\n`,
+        "c.ts": `export function c() {}\n`,
+        "d.ts": `export function d() {}\n`,
+      },
+      () =>
+        Effect.gen(function* () {
+          const service = yield* RepoMap.Service
+          const small = yield* service.build(1)
+          const large = yield* service.build(1_000_000)
+          // A different budget must not reuse the small-budget cache.
+          const smallLines = small.split("\n").filter((line) => line.includes(".ts ::")).length
+          const largeLines = large.split("\n").filter((line) => line.includes(".ts ::")).length
+          expect(smallLines).toBe(1)
+          expect(largeLines).toBeGreaterThan(smallLines)
+        }),
+    ),
+  )
 })

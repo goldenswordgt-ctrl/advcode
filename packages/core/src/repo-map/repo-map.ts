@@ -1,7 +1,9 @@
 export * as RepoMap from "./repo-map"
 
 import { makeLocationNode } from "../effect/app-node"
-import { Context, Effect, Layer } from "effect"
+import { Context, Effect, Layer, Option, Ref, Stream } from "effect"
+import { EventV2 } from "../event"
+import { FileSystemWatcher } from "@opencode-ai/schema/filesystem-watcher"
 import { FSUtil } from "../fs-util"
 import { Location } from "../location"
 import path from "path"
@@ -21,9 +23,11 @@ import { extractDefinitions, rankFiles, type Definition, type RankedFile } from 
  *   3. compute connectivity (cross-file symbol references) with a bounded grep
  *   4. rank by density + connectivity, then truncate to a token budget
  *
- * Everything is best-effort and bounded: a pathological repo can never stall or
- * fail a provider turn. If no map can be built, we return an empty string and
- * the system-context contributor simply omits it.
+ * The result is cached per budget. Any file add/edit/delete event invalidates
+ * the cache so the next build is fresh — a turn never rescans an unchanged
+ * tree. Everything is best-effort and bounded: a pathological repo can never
+ * stall or fail a provider turn. If no map can be built, we return an empty
+ * string and the system-context contributor simply omits it.
  */
 
 const DEFAULT_TOKEN_BUDGET = 1000
@@ -67,8 +71,21 @@ const layer = Layer.effect(
     const location = yield* Location.Service
     const fs = yield* FSUtil.Service
     const ripgrep = yield* Ripgrep.Service
+    const events = yield* EventV2.Service
+
+    // Cache of the last built map, keyed by budget. None until built; any file
+    // add/edit/delete event resets it so a later turn rebuilds fresh. This keeps
+    // the (potentially heavy) scan out of the per-turn hot path.
+    const cache = yield* Ref.make<Option.Option<{ budget: number; map: string }>>(Option.none())
+    yield* events.subscribe(FileSystemWatcher.Event.Updated).pipe(
+      Stream.runForEach(() => Ref.set(cache, Option.none())),
+      Effect.forkScoped({ startImmediately: true }),
+    )
 
     const build = Effect.fn("RepoMap.build")(function* (tokenBudget = DEFAULT_TOKEN_BUDGET) {
+      const cached = yield* Ref.get(cache)
+      if (Option.isSome(cached) && cached.value.budget === tokenBudget) return cached.value.map
+
       const projectDir = location.project.directory
       const charBudget = tokenBudget * CHARS_PER_TOKEN
 
@@ -152,12 +169,15 @@ const layer = Layer.effect(
 
       if (lines.length === 0) return ""
 
-      return [
+      const map = [
         "<repo_map>",
         "Project overview by file and the symbols they define, ranked by centrality.",
         ...lines,
         `</repo_map> (${lines.length} files shown under a ${tokenBudget}-token budget)`,
       ].join("\n")
+
+      yield* Ref.set(cache, Option.some({ budget: tokenBudget, map }))
+      return map
     })
 
     return Service.of({ build })
@@ -167,5 +187,5 @@ const layer = Layer.effect(
 export const node = makeLocationNode({
   service: Service,
   layer,
-  deps: [Location.node, FSUtil.node, Ripgrep.node],
+  deps: [Location.node, FSUtil.node, Ripgrep.node, EventV2.node],
 })

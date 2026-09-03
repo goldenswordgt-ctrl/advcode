@@ -3,14 +3,39 @@ import { Effect, Layer } from "effect"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { RepoMap } from "@opencode-ai/core/repo-map/repo-map"
 import { RepoMapGuidance } from "@opencode-ai/core/repo-map/guidance"
+import { Config } from "@opencode-ai/core/config"
+import { ConfigExperimental } from "@opencode-ai/core/config/experimental"
 import { SystemContext } from "@opencode-ai/core/system-context/index"
 import { it } from "../lib/effect"
 
-const guidanceLayer = (repoMap: Layer.Layer<RepoMap.Service>) =>
-  AppNodeBuilder.build(RepoMapGuidance.node, [[RepoMap.node, repoMap]])
+const repoMapEnabled = Layer.succeed(
+  Config.Service,
+  Config.Service.of({
+    entries: () =>
+      Effect.succeed([
+        new Config.Document({ type: "document", info: new Config.Info({ experimental: new ConfigExperimental.Experimental({ repo_map: true }) }) }),
+      ]),
+  }),
+)
+
+const repoMapDisabled = Layer.succeed(
+  Config.Service,
+  Config.Service.of({
+    entries: () =>
+      Effect.succeed([
+        new Config.Document({ type: "document", info: new Config.Info({ experimental: new ConfigExperimental.Experimental({ repo_map: false }) }) }),
+      ]),
+  }),
+)
+
+const guidanceLayer = (repoMap: Layer.Layer<RepoMap.Service>, config: Layer.Layer<Config.Service>) =>
+  AppNodeBuilder.build(RepoMapGuidance.node, [
+    [RepoMap.node, repoMap],
+    [Config.node, config],
+  ])
 
 describe("RepoMapGuidance", () => {
-  it.effect("exposes the built repo map in the system context", () =>
+  it.effect("exposes the built repo map when the repo_map flag is on", () =>
     Effect.gen(function* () {
       const guidance = yield* RepoMapGuidance.Service
       const generation = yield* SystemContext.initialize(yield* guidance.load())
@@ -31,7 +56,20 @@ describe("RepoMapGuidance", () => {
                 ].join("\n"),
               ),
           }),
+          repoMapEnabled,
         ),
+      ),
+    ),
+  )
+
+  it.effect("omits the repo map when the flag is off (default)", () =>
+    Effect.gen(function* () {
+      const guidance = yield* RepoMapGuidance.Service
+      const generation = yield* SystemContext.initialize(yield* guidance.load())
+      expect(generation.baseline).toBe("")
+    }).pipe(
+      Effect.provide(
+        guidanceLayer(Layer.mock(RepoMap.Service, { build: () => Effect.succeed("<repo_map>mocked</repo_map>") }), repoMapDisabled),
       ),
     ),
   )
@@ -42,7 +80,9 @@ describe("RepoMapGuidance", () => {
       const generation = yield* SystemContext.initialize(yield* guidance.load())
       expect(generation.baseline).toBe("")
     }).pipe(
-      Effect.provide(guidanceLayer(Layer.mock(RepoMap.Service, { build: () => Effect.succeed("") }))),
+      Effect.provide(
+        guidanceLayer(Layer.mock(RepoMap.Service, { build: () => Effect.succeed("") }), repoMapEnabled),
+      ),
     ),
   )
 })

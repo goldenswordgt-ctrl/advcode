@@ -15,4 +15,8 @@ export class Policy extends Schema.Class<Policy>("ConfigV2.Experimental.Policy")
 
 export class Experimental extends Schema.Class<Experimental>("ConfigV2.Experimental")({
   policies: Policy.pipe(Schema.Array, Schema.optional),
+  // When enabled, the per-turn system context includes a token-budgeted repo
+  // map. Off by default: building the map is environment-dependent and would
+  // otherwise break deterministic/fixtured turns.
+  repo_map: Schema.Boolean.pipe(Schema.optional),
 }) {}
