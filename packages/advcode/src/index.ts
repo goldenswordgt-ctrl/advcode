@@ -39,6 +39,8 @@ import { ScheduleCommand } from "./cli/cmd/schedule"
 import { LogCommand } from "./cli/cmd/log"
 import { BrowserCommand } from "./cli/cmd/browser"
 import { CurateCommand } from "./cli/cmd/curate"
+import { AfkCommand } from "./cli/cmd/afk"
+import { TranscriptListCommand, TranscriptGetCommand } from "./cli/cmd/transcript"
 import { Heap } from "./cli/heap"
 
 const args = hideBin(process.argv)
@@ -130,6 +132,13 @@ const cli = yargs(args)
   .command(LogCommand)
   .command(BrowserCommand)
   .command(CurateCommand)
+  .command(AfkCommand)
+  .command({
+    command: "transcript",
+    describe: "manage session transcripts",
+    builder: (yargs) => yargs.command(TranscriptListCommand).command(TranscriptGetCommand).demandCommand(),
+    async handler() {},
+  })
   .fail((msg, err) => {
     if (
       msg?.startsWith("Unknown argument") ||

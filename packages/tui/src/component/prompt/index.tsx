@@ -37,7 +37,15 @@ import { usePromptStash } from "../../prompt/stash"
 import { DialogStash } from "../dialog-stash"
 import { type AutocompleteRef, Autocomplete } from "./autocomplete"
 import { useRenderer, useTerminalDimensions, type JSX } from "@opentui/solid"
-import type { AssistantMessage, FilePart, UserMessage } from "@opencode-ai/sdk/v2"
+import type {
+  AgentPartInput,
+  AssistantMessage,
+  FilePart,
+  FilePartInput,
+  SubtaskPartInput,
+  TextPartInput,
+  UserMessage,
+} from "@opencode-ai/sdk/v2"
 import { Locale } from "../../util/locale"
 import { errorMessage } from "../../util/error"
 import { formatDuration } from "../../util/format"
@@ -358,6 +366,19 @@ export function Prompt(props: PromptProps) {
         },
       },
       {
+        title: "Submit prompt (steer/inject)",
+        name: "prompt.submit.steer",
+        category: "Prompt",
+        hidden: true,
+        run: async () => {
+          if (!input.focused) return
+          const handled = await submit(true)
+          if (!handled) return
+
+          dialog.clear()
+        },
+      },
+      {
         title: "Remove editor context",
         name: "prompt.editor_context.clear",
         category: "Prompt",
@@ -567,6 +588,7 @@ export function Prompt(props: PromptProps) {
     mode: OPENCODE_BASE_MODE,
     bindings: tuiConfig.keybinds.gather("prompt.palette", [
       "prompt.submit",
+      "prompt.submit.steer",
       "prompt.editor",
       "prompt.editor_context.clear",
       "prompt.stash",
@@ -927,8 +949,48 @@ export function Prompt(props: PromptProps) {
     }
   })
 
+  // Client-side pending queue: when a session is busy we buffer the prompt
+  // instead of letting `session.prompt` drop it, then auto-dispatch the front
+  // item as soon as the session returns to idle. `steer` (inject) items are
+  // prepended so they land ahead of already-buffered prompts.
+  type PendingPrompt = {
+    sessionID: string
+    agent: string
+    model: { providerID: string; modelID: string }
+    variant?: string
+    parts: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
+  }
+  const [pendingPrompts, setPendingPrompts] = createSignal<PendingPrompt[]>([])
+  let draining = false
+
+  const dispatchPrompt = (args: PendingPrompt) => {
+    sdk.client.session
+      .prompt(args, { throwOnError: true })
+      .catch((error) => {
+        toast.show({
+          title: "Failed to send prompt",
+          message: errorMessage(error),
+          variant: "error",
+        })
+      })
+  }
+
+  // When the session transitions busy -> idle, drain the front queued prompt.
+  createEffect(() => {
+    if (status().type !== "idle") return
+    if (draining) return
+    const next = pendingPrompts()[0]
+    if (!next) return
+    draining = true
+    setPendingPrompts((queue) => queue.slice(1))
+    void Promise.resolve().then(() => {
+      dispatchPrompt(next)
+      draining = false
+    })
+  })
+
   let submitting = false
-  async function submit() {
+  async function submit(steer = false) {
     // Prevent overlapping invocations (e.g. a double-pressed Enter, or the
     // input's native onSubmit racing another dispatch). Without this guard,
     // a second call slips past the empty-input check before the first call
@@ -938,13 +1000,13 @@ export function Prompt(props: PromptProps) {
     if (submitting) return false
     submitting = true
     try {
-      return await submitInner()
+      return await submitInner(steer)
     } finally {
       submitting = false
     }
   }
 
-  async function submitInner() {
+  async function submitInner(steer = false) {
     workspace.clearNotice()
 
     // IME: double-defer may fire before onContentChange flushes the last
@@ -1091,32 +1153,31 @@ export function Prompt(props: PromptProps) {
       })
     } else {
       move.startSubmit()
-      sdk.client.session
-        .prompt(
+      const promptArgs: PendingPrompt = {
+        sessionID,
+        agent: agent.name,
+        model: selectedModel,
+        variant,
+        parts: [
+          ...editorParts,
           {
-            sessionID,
-            ...selectedModel,
-            agent: agent.name,
-            model: selectedModel,
-            variant,
-            parts: [
-              ...editorParts,
-              {
-                type: "text",
-                text: inputText,
-              },
-              ...nonTextParts,
-            ],
+            type: "text",
+            text: inputText,
           },
-          { throwOnError: true },
-        )
-        .catch((error) => {
-          toast.show({
-            title: "Failed to send prompt",
-            message: errorMessage(error),
-            variant: "error",
-          })
+          ...nonTextParts,
+        ],
+      }
+      const busy = status().type !== "idle" || pendingPrompts().length > 0
+      if (busy) {
+        setPendingPrompts((queue) => (steer ? [promptArgs, ...queue] : [...queue, promptArgs]))
+        toast.show({
+          title: steer ? "Prompt queued at front" : "Prompt queued",
+          message: "Will send once the current turn completes.",
+          variant: "info",
         })
+      } else {
+        dispatchPrompt(promptArgs)
+      }
       if (editorParts.length > 0) editor.markSelectionSent()
     }
     history.append({

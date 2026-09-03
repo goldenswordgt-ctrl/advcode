@@ -5,11 +5,13 @@ import { useDirectory } from "../../context/directory"
 import { useConnected } from "../../component/use-connected"
 import { createStore } from "solid-js/store"
 import { useRoute } from "../../context/route"
+import { usePresence } from "../../context/presence"
 
 export function Footer() {
   const { theme } = useTheme()
   const sync = useSync()
   const route = useRoute()
+  const presence = usePresence()
   const mcp = createMemo(() => Object.values(sync.data.mcp).filter((x) => x.status === "connected").length)
   const mcpError = createMemo(() => Object.values(sync.data.mcp).some((x) => x.status === "failed"))
   const lsp = createMemo(() => Object.keys(sync.data.lsp))
@@ -19,6 +21,21 @@ export function Footer() {
   })
   const directory = useDirectory()
   const connected = useConnected()
+
+  // Cross-window / cross-session presence: how many other sessions (any window
+  // on the shared instance) are actively working/streaming right now, and is
+  // another window grinding on THIS session?
+  const otherActive = createMemo(() => {
+    const sessions = Object.values(presence.sessions)
+    let active = 0
+    let sameSession = false
+    for (const p of sessions) {
+      if (p.status !== "working" && p.status !== "streaming") continue
+      active += 1
+      if (route.data.type === "session" && p.sessionID === route.data.sessionID) sameSession = true
+    }
+    return { active, sameSession }
+  })
 
   const [store, setStore] = createStore({
     welcome: false,
@@ -80,6 +97,12 @@ export function Footer() {
                   </Match>
                 </Switch>
                 {mcp()} MCP
+              </text>
+            </Show>
+            <Show when={otherActive().active > 0}>
+              <text fg={otherActive().sameSession ? theme.warning : theme.text}>
+                <span style={{ fg: otherActive().sameSession ? theme.warning : theme.textMuted }}>◉</span>{" "}
+                {otherActive().active} live{otherActive().sameSession ? " (this)" : ""}
               </text>
             </Show>
             <text fg={theme.textMuted}>/status</text>

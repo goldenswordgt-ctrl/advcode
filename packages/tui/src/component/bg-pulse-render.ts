@@ -77,6 +77,20 @@ export type GoUpsellArtRenderOptions = {
   cache?: boolean
 }
 
+// Animation-specific colors — per-theme flowing palette
+export type AnimationColors = {
+  /** Ring colors (2-3 that cycle through the expanding rings) */
+  flowPalette?: Rgb[]
+  /** Shimmer accent for logo highlight sweep */
+  shimmer?: Rgb
+  /** Speed multiplier (1.0 = default) */
+  speed?: number
+  /** Ring intensity multiplier (1.0 = default) */
+  intensity?: number
+  /** Background breathing color override */
+  breathe?: Rgb
+}
+
 const CACHE_FRAME_COUNT = Math.round(PERIOD / (1000 / 30))
 const CACHE_FRAMES_PER_RENDER = 1
 
@@ -124,6 +138,12 @@ export class GoUpsellArtPainter {
   private panelRgb: Rgb = [0, 0, 0]
   private primaryRgb: Rgb = [255, 255, 255]
   private logoBaseRgb: Rgb = [180, 180, 180]
+  // Animation-specific colors
+  private flowPalette: Rgb[] = []
+  private shimmerRgb: Rgb = [255, 255, 255]
+  private animSpeed = 1
+  private animIntensity = 1
+  private breatheRgb: Rgb | undefined
   private elapsed = 0
   private distances = new Float32Array(0)
   private edgeFalloff = new Float32Array(0)
@@ -167,9 +187,37 @@ export class GoUpsellArtPainter {
     return true
   }
 
+  setAnimationColors(colors: AnimationColors | undefined) {
+    if (!colors) return false
+    let changed = false
+    const palettes = colors.flowPalette ?? []
+    if (palettes.length !== this.flowPalette.length || palettes.some((c, i) => !sameRgb(c, this.flowPalette[i]!))) {
+      this.flowPalette = palettes
+      changed = true
+    }
+    if (colors.shimmer && !sameRgb(colors.shimmer, this.shimmerRgb)) {
+      this.shimmerRgb = colors.shimmer
+      changed = true
+    }
+    if (colors.speed !== undefined && colors.speed !== this.animSpeed) {
+      this.animSpeed = colors.speed
+      changed = true
+    }
+    if (colors.intensity !== undefined && colors.intensity !== this.animIntensity) {
+      this.animIntensity = colors.intensity
+      changed = true
+    }
+    if (colors.breathe && (!this.breatheRgb || !sameRgb(colors.breathe, this.breatheRgb))) {
+      this.breatheRgb = colors.breathe
+      changed = true
+    }
+    if (changed) this.invalidateCache()
+    return changed
+  }
+
   render(frameBuffer: OptimizedBuffer, options: GoUpsellArtRenderOptions = {}) {
     const rgb = options.rgb === true
-    this.elapsed = (this.elapsed + (options.deltaTime ?? 0)) % PERIOD
+    this.elapsed = (this.elapsed + (options.deltaTime ?? 0) * this.animSpeed) % PERIOD
     this.rebuildGeometry(frameBuffer, rgb)
     if (options.cache !== false) {
       this.drawCached(frameBuffer, rgb)
@@ -296,10 +344,28 @@ export class GoUpsellArtPainter {
     const baseR = this.panelRgb[0]
     const baseG = this.panelRgb[1]
     const baseB = this.panelRgb[2]
-    const deltaR = this.primaryRgb[0] - baseR
-    const deltaG = this.primaryRgb[1] - baseG
-    const deltaB = this.primaryRgb[2] - baseB
+    const breathColor = this.breatheRgb ?? this.primaryRgb
+    const deltaR = breathColor[0] - baseR
+    const deltaG = breathColor[1] - baseG
+    const deltaB = breathColor[2] - baseB
     const breath = (0.5 + 0.5 * Math.sin(t * BREATH_SPEED)) * BREATH_AMP
+    const paletteLen = this.flowPalette.length
+    const intensity = this.animIntensity
+
+    // Per-ring colors from flow palette, falling back to primary
+    const ring0 = paletteLen > 0 ? this.flowPalette[0]! : this.primaryRgb
+    const ring1 = paletteLen > 1 ? this.flowPalette[1]! : this.primaryRgb
+    const ring2 = paletteLen > 2 ? this.flowPalette[2]! : this.primaryRgb
+
+    const ringDelta0R = ring0[0] - baseR
+    const ringDelta0G = ring0[1] - baseG
+    const ringDelta0B = ring0[2] - baseB
+    const ringDelta1R = ring1[0] - baseR
+    const ringDelta1G = ring1[1] - baseG
+    const ringDelta1B = ring1[2] - baseB
+    const ringDelta2R = ring2[0] - baseR
+    const ringDelta2G = ring2[1] - baseG
+    const ringDelta2B = ring2[2] - baseB
 
     const phase0 = (t / PERIOD - PHASE_OFFSET + 1) % 1
     const phase1 = (t / PERIOD + 1 / RINGS - PHASE_OFFSET + 1) % 1
@@ -331,16 +397,39 @@ export class GoUpsellArtPainter {
       const crest2 = abs2 < WIDTH ? 0.5 + 0.5 * Math.cos((delta2 / WIDTH) * Math.PI) : 0
       const tail2 = delta2 < 0 && delta2 > -TAIL ? (1 + delta2 * TAIL_SCALE) ** 2.3 : 0
 
-      const level =
-        (crest0 * AMP + tail0 * TAIL_AMP) * eased0 +
-        (crest1 * AMP + tail1 * TAIL_AMP) * eased1 +
-        (crest2 * AMP + tail2 * TAIL_AMP) * eased2
-      const rawStrength = (level * RING_SCALE + breath) * edgeFalloff[index]
+      // Each ring uses its own color from the flow palette
+      const level0 = (crest0 * AMP + tail0 * TAIL_AMP) * eased0 * intensity
+      const level1 = (crest1 * AMP + tail1 * TAIL_AMP) * eased1 * intensity
+      const level2 = (crest2 * AMP + tail2 * TAIL_AMP) * eased2 * intensity
+      const ringStrength = level0 * RING_SCALE
+      const ringStrength1 = level1 * RING_SCALE
+      const ringStrength2 = level2 * RING_SCALE
+      const rawStrength = ringStrength + ringStrength1 + ringStrength2 + breath * edgeFalloff[index]
       const strength = (rawStrength > 1 ? 1 : rawStrength) * 0.7
+
+      // Blend per-ring colors into the base
+      const r = Math.round(
+        baseR +
+          ringDelta0R * clamp(ringStrength) +
+          ringDelta1R * clamp(ringStrength1) +
+          ringDelta2R * clamp(ringStrength2) +
+          deltaR * clamp(breath * edgeFalloff[index]),
+      )
+      const g = Math.round(
+        baseG +
+          ringDelta0G * clamp(ringStrength) +
+          ringDelta1G * clamp(ringStrength1) +
+          ringDelta2G * clamp(ringStrength2) +
+          deltaG * clamp(breath * edgeFalloff[index]),
+      )
+      const b = Math.round(
+        baseB +
+          ringDelta0B * clamp(ringStrength) +
+          ringDelta1B * clamp(ringStrength1) +
+          ringDelta2B * clamp(ringStrength2) +
+          deltaB * clamp(breath * edgeFalloff[index]),
+      )
       const offset = index * 4
-      const r = Math.round(baseR + deltaR * strength)
-      const g = Math.round(baseG + deltaG * strength)
-      const b = Math.round(baseB + deltaB * strength)
       bg[offset] = fg[offset] = r
       bg[offset + 1] = fg[offset + 1] = g
       bg[offset + 2] = fg[offset + 2] = b
@@ -390,6 +479,11 @@ export class GoUpsellArtPainter {
     const head0 = phase0 * LOGO_REACH
     const head1 = phase1 * LOGO_REACH
 
+    // Shimmer sweep — a bright highlight that crosses the logo left-to-right
+    const shimmerCycle = (t / (PERIOD * 1.3)) % 1
+    const shimmerX = shimmerCycle * (LOGO_WIDTH + 6) - 3
+    const hasShimmer = this.shimmerRgb[0] !== 255 || this.shimmerRgb[1] !== 255 || this.shimmerRgb[2] !== 255
+
     for (let i = 0; i < LOGO_TEMPLATE.length; i++) {
       const cell = LOGO_TEMPLATE[i]!
       const index = this.logoIndexes[i]!
@@ -401,6 +495,12 @@ export class GoUpsellArtPainter {
       const bottomPeak = this.pulsePeak
       const bottomPrimary = this.pulsePrimary
 
+      // Shimmer highlight — Gaussian envelope around the sweep position
+      const shimmerDelta = cell.x - shimmerX
+      const shimmerStrength = hasShimmer
+        ? Math.exp(-(shimmerDelta * shimmerDelta) / 4) * 0.45
+        : 0
+
       if (cell.kind === LogoCellKind.Background) {
         writeLogoTint(bg, offset, shadow, this.primaryRgb, 0, Math.max(topPeak, bottomPeak) * 0.18)
         continue
@@ -408,6 +508,14 @@ export class GoUpsellArtPainter {
 
       if (cell.kind === LogoCellKind.Top) {
         writeLogoTint(fg, offset, this.logoBaseRgb, this.primaryRgb, topPrimary, topPeak)
+        // Apply shimmer overlay on top
+        if (shimmerStrength > 0.01) {
+          const [sr, sg, sb] = this.shimmerRgb
+          const off = offset
+          fg[off] = Math.min(255, Math.round(fg[off] + (sr - fg[off]) * shimmerStrength))
+          fg[off + 1] = Math.min(255, Math.round(fg[off + 1] + (sg - fg[off + 1]) * shimmerStrength))
+          fg[off + 2] = Math.min(255, Math.round(fg[off + 2] + (sb - fg[off + 2]) * shimmerStrength))
+        }
         writeLogoTint(bg, offset, shadow, this.primaryRgb, 0, bottomPeak * 0.18)
         continue
       }
@@ -431,6 +539,14 @@ export class GoUpsellArtPainter {
         (topPrimary + bottomPrimary) / 2,
         (topPeak + bottomPeak) / 2,
       )
+      // Shimmer overlay on regular chars too
+      if (shimmerStrength > 0.01) {
+        const [sr, sg, sb] = this.shimmerRgb
+        const off = offset
+        fg[off] = Math.min(255, Math.round(fg[off] + (sr - fg[off]) * shimmerStrength))
+        fg[off + 1] = Math.min(255, Math.round(fg[off + 1] + (sg - fg[off + 1]) * shimmerStrength))
+        fg[off + 2] = Math.min(255, Math.round(fg[off + 2] + (sb - fg[off + 2]) * shimmerStrength))
+      }
     }
   }
 }

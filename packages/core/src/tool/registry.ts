@@ -3,7 +3,11 @@ export * as ToolRegistry from "./registry"
 import { ToolOutput, type ToolCall, type ToolDefinition, type ToolResultValue } from "@opencode-ai/llm"
 import { Context, Effect, Layer, Scope } from "effect"
 import { AgentV2 } from "../agent"
+import { EventV2 } from "../event"
+import { Hooks } from "../hooks/hooks"
+import { Location } from "../location"
 import { PermissionV2 } from "../permission"
+import { ToolLog } from "../session/tool-log"
 import { SessionMessage } from "../session/message"
 import { SessionSchema } from "../session/schema"
 import { ToolOutputStore } from "../tool-output-store"
@@ -44,6 +48,9 @@ const registryLayer = Layer.effect(
   Effect.gen(function* () {
     const applications = yield* ApplicationTools.Service
     const resources = yield* ToolOutputStore.Service
+    const hooks = yield* Hooks.Service
+    const location = yield* Location.Service
+    const events = yield* EventV2.Service
     type Registration = { readonly identity: object; readonly tool: AnyTool }
     const local = new Map<string, Array<{ readonly token: object; readonly registration: Registration }>>()
 
@@ -59,6 +66,28 @@ const registryLayer = Layer.effect(
         }
       if (advertised && registration.identity !== advertised)
         return { result: { type: "error" as const, value: `Stale tool call: ${input.call.name}` } }
+
+      const preResult = yield* hooks.preToolUse({
+        tool: input.call.name,
+        input: input.call.input,
+        cwd: location.directory,
+      })
+      if (preResult.blocked)
+        return {
+          result: {
+            type: "error" as const,
+            value: preResult.reason ?? `Tool blocked by hook: ${input.call.name}`,
+          },
+        }
+
+      yield* ToolLog.recordIntentStart(events, {
+        sessionID: input.sessionID,
+        agent: input.agent,
+        toolCallID: input.call.id,
+        tool: input.call.name,
+        toolInput: input.call.input,
+      })
+
       const pending = yield* settle(registration.tool, input.call, {
         sessionID: input.sessionID,
         agent: input.agent,
@@ -70,12 +99,50 @@ const registryLayer = Layer.effect(
           Effect.succeed({ result: { type: "error" as const, value: failure.message } }),
         ),
       )
-      if ("result" in pending) return pending
+
+      const hookOutput = "result" in pending ? pending.result : pending.output
+      yield* hooks
+        .postToolUse({
+          tool: input.call.name,
+          input: input.call.input,
+          output: hookOutput,
+          cwd: location.directory,
+        })
+        .pipe(Effect.catch(() => Effect.void))
+
+      if ("result" in pending) {
+        yield* ToolLog.recordIntentEnd(events, {
+          sessionID: input.sessionID,
+          agent: input.agent,
+          toolCallID: input.call.id,
+          tool: input.call.name,
+          resultType: "error",
+          outputSummary: typeof pending.result.value === "string" ? pending.result.value : undefined,
+        })
+        return pending
+      }
       const output = pending.output
       const bounded = yield* resources.bound({ sessionID: input.sessionID, toolCallID: input.call.id, output })
       const result = ToolOutput.toResultValue(bounded.output)
-      if (result.type === "error")
+      if (result.type === "error") {
+        yield* ToolLog.recordIntentEnd(events, {
+          sessionID: input.sessionID,
+          agent: input.agent,
+          toolCallID: input.call.id,
+          tool: input.call.name,
+          resultType: "error",
+          outputSummary: typeof result.value === "string" ? result.value : undefined,
+        })
         return bounded.outputPaths.length > 0 ? { result, outputPaths: bounded.outputPaths } : { result }
+      }
+      yield* ToolLog.recordIntentEnd(events, {
+        sessionID: input.sessionID,
+        agent: input.agent,
+        toolCallID: input.call.id,
+        tool: input.call.name,
+        resultType: "success",
+        outputSummary: typeof result.value === "string" ? result.value : undefined,
+      })
       return bounded.outputPaths.length > 0
         ? { result, output: bounded.output, outputPaths: bounded.outputPaths }
         : { result, output: bounded.output }
@@ -137,11 +204,11 @@ function whollyDisabled(action: string, rules: PermissionV2.Ruleset) {
 export const node = makeLocationNode({
   service: Service,
   layer,
-  deps: [ApplicationTools.node, ToolOutputStore.node],
+  deps: [ApplicationTools.node, ToolOutputStore.node, Hooks.node, Location.node, EventV2.node],
 })
 
 export const toolsNode = makeLocationNode({
   service: Tools.Service,
   layer,
-  deps: [ApplicationTools.node, ToolOutputStore.node],
+  deps: [ApplicationTools.node, ToolOutputStore.node, Hooks.node, Location.node, EventV2.node],
 })

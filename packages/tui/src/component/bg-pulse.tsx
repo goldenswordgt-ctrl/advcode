@@ -8,12 +8,13 @@ import {
 import { extend, useRenderer } from "@opentui/solid"
 import { onCleanup, onMount } from "solid-js"
 import { tint, useTheme } from "../context/theme"
-import { GoUpsellArtPainter } from "./bg-pulse-render"
+import { GoUpsellArtPainter, toRgb, type AnimationColors } from "./bg-pulse-render"
 
 type GoUpsellArtOptions = RenderableOptions<FrameBufferRenderable> & {
   backgroundPanel?: RGBA
   primary?: RGBA
   logoBase?: RGBA
+  animationColors?: AnimationColors
 }
 
 class GoUpsellArtRenderable extends FrameBufferRenderable {
@@ -35,6 +36,7 @@ class GoUpsellArtRenderable extends FrameBufferRenderable {
     this.painter.setBackgroundPanel(options.backgroundPanel)
     this.painter.setPrimary(options.primary)
     this.painter.setLogoBase(options.logoBase)
+    if (options.animationColors) this.painter.setAnimationColors(options.animationColors)
   }
 
   set backgroundPanel(value: RGBA | undefined) {
@@ -47,6 +49,10 @@ class GoUpsellArtRenderable extends FrameBufferRenderable {
 
   set primary(value: RGBA | undefined) {
     if (this.painter.setPrimary(value)) this.requestRender()
+  }
+
+  set animationColors(value: AnimationColors | undefined) {
+    if (this.painter.setAnimationColors(value)) this.requestRender()
   }
 
   protected override renderSelf(buffer: OptimizedBuffer, deltaTime = 0): void {
@@ -67,6 +73,20 @@ declare module "@opentui/solid" {
 }
 
 extend({ go_upsell_art: GoUpsellArtRenderable })
+
+function resolveAnimColors(theme: ReturnType<typeof useTheme>["theme"]): AnimationColors | undefined {
+  const anim = theme.animation
+  if (!anim) return undefined
+  const hasContent = anim.flowPalette || anim.shimmer || anim.speed || anim.intensity || anim.breathe
+  if (!hasContent) return undefined
+  const colors: AnimationColors = {}
+  if (anim.flowPalette) colors.flowPalette = anim.flowPalette.map((c) => toRgb(c))
+  if (anim.shimmer) colors.shimmer = toRgb(anim.shimmer)
+  if (anim.speed !== undefined) colors.speed = anim.speed
+  if (anim.intensity !== undefined) colors.intensity = anim.intensity
+  if (anim.breathe) colors.breathe = toRgb(anim.breathe)
+  return colors
+}
 
 export function BgPulse() {
   const { theme } = useTheme()
@@ -93,6 +113,7 @@ export function BgPulse() {
       backgroundPanel={theme.backgroundPanel}
       primary={theme.primary}
       logoBase={tint(theme.background, theme.text, 0.62)}
+      animationColors={resolveAnimColors(theme)}
       live
     />
   )

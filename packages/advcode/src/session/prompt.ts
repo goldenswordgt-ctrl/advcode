@@ -1359,6 +1359,26 @@ const layer = Layer.effect(
         command: input.command,
         agent: input.agent,
       })
+
+      // Direct execution for AFK commands — no model needed
+      if (input.command === "afk" || input.command === "unafk") {
+        const { execSync } = require("node:child_process") as typeof import("node:child_process")
+        const sessionArg = input.command === "afk" ? `on ${input.sessionID}` : "off"
+        try {
+          execSync(`python3 ~/.opencode/afk_protocol.py ${sessionArg}`, { encoding: "utf-8" })
+        } catch {
+          // state manager might not exist yet — that's fine
+        }
+        // publish a fake executed event so the TUI shows the command ran
+        yield* events.publish(Command.Event.Executed, {
+          name: input.command,
+          sessionID: input.sessionID,
+          arguments: input.arguments,
+          messageID: "" as any,
+        })
+        return { info: { id: ulid(), role: "user" as const, parts: [] } } as any
+      }
+
       const cmd = yield* commands.get(input.command)
       if (!cmd) {
         const available = (yield* commands.list()).map((c) => c.name)

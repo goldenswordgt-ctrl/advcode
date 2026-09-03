@@ -38,6 +38,7 @@ import { MemoryV2 } from "./memory/memory"
 import { MemoryContext } from "./memory/context"
 import { BotMode } from "./bot/bot"
 import { BotRunner } from "./bot/runner"
+import { ObserverJob } from "./observer/observer"
 import { Snapshot } from "./snapshot"
 import { SystemContextBuiltIns } from "./system-context/builtins"
 import { SystemContextRegistry } from "./system-context/registry"
@@ -94,6 +95,7 @@ export const locationServices = LayerNode.group([
   SessionRunnerModel.node,
   Snapshot.node,
   SessionRunnerLLM.node,
+  ObserverJob.node,
 ])
 
 export type LocationServices = LayerNode.Output<typeof locationServices>

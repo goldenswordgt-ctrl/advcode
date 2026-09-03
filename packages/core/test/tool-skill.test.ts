@@ -1,9 +1,12 @@
 import fs from "fs/promises"
 import path from "path"
 import { describe, expect } from "bun:test"
-import { Effect, Layer } from "effect"
+import { Effect, Layer, Stream } from "effect"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { EventV2 } from "@opencode-ai/core/event"
+import { Hooks } from "@opencode-ai/core/hooks/hooks"
+import { Location } from "@opencode-ai/core/location"
 import { PermissionV2 } from "@opencode-ai/core/permission"
 import { AbsolutePath } from "@opencode-ai/core/schema"
 import { SessionV2 } from "@opencode-ai/core/session"
@@ -16,6 +19,31 @@ import { it } from "./lib/effect"
 import { toolIdentity, executeTool, settleTool, toolDefinitions } from "./lib/tool"
 
 const sessionID = SessionV2.ID.make("ses_skill_tool_test")
+
+const hooksStub = Layer.succeed(
+  Hooks.Service,
+  Hooks.Service.of({
+    preToolUse: (input) => Effect.succeed({ blocked: false }),
+    postToolUse: () => Effect.void,
+    postToolBatch: () => Effect.void,
+  }),
+)
+
+const eventStub = Layer.succeed(
+  EventV2.Service,
+  EventV2.Service.of({
+    publish: () => Effect.succeed(undefined as never),
+    subscribe: () => Stream.empty,
+    all: () => Stream.empty,
+    durable: () => Stream.empty,
+    listen: () => Effect.succeed(Effect.void),
+    project: () => Effect.void,
+    replay: () => Effect.void,
+    replayAll: () => Effect.succeed(undefined),
+    remove: () => Effect.void,
+    claim: () => Effect.void,
+  }),
+)
 
 describe("SkillTool", () => {
   it.live("lists available skills, authorizes the selected name, and loads model-facing content", () =>
@@ -71,6 +99,9 @@ describe("SkillTool", () => {
               [PermissionV2.node, permission],
               [SkillV2.node, skills],
               [ToolOutputStore.node, ToolOutputStore.nodeWithoutConfig],
+              [Hooks.node, hooksStub],
+              [Location.node, Location.boundNode({ directory: AbsolutePath.make("/project") })],
+              [EventV2.node, eventStub],
             ],
           )
 

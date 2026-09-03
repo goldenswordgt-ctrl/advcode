@@ -4,6 +4,7 @@ import { Cause, Clock, Duration, Effect, Schedule } from "effect"
 import { MessageV2 } from "./message-v2"
 import { iife } from "@/util/iife"
 import { isRecord } from "@/util/record"
+import { isConnectivityFailure, reportNetworkError, connectivity } from "@/provider/network-monitor"
 
 export type Err = ReturnType<NamedError["toObject"]>
 
@@ -29,6 +30,12 @@ export const RETRY_JITTER_FACTOR = 0.25
 export const RETRY_MAX_DELAY_NO_HEADERS = 30_000 // 30 seconds
 export const RETRY_MAX_DELAY = 2_147_483_647 // max 32-bit signed integer for setTimeout
 export const RETRY_MAX_RETRIES = 5
+
+// Tracks the highest attempt count reached while parked on a connectivity hold,
+// so that when the network returns we don't immediately hit the max-retries cap
+// with an attempt counter that the hold inflated. Reset on each transition back
+// online.
+let lastParkedAttempt = 0
 
 const RETRYABLE_MESSAGE_PATTERNS = [
   /429|500|502|503|504|524/i,
@@ -87,6 +94,11 @@ export function retryable(error: Err, provider: string) {
   if (SessionV1.ContextOverflowError.isInstance(error)) return undefined
   if (SessionV1.APIError.isInstance(error)) {
     const status = error.data.statusCode
+    // Connectivity failures should notify the network monitor so it holds the
+    // retry loop until the connection returns rather than burning retries.
+    if (!status && error.data.message && isConnectivityFailure(error.data.message)) {
+      reportNetworkError({ cause: error.data.message, providerID: provider })
+    }
     // 5xx errors are transient server failures and should always be retried,
     // even when the provider SDK doesn't explicitly mark them as retryable.
     if (
@@ -190,7 +202,31 @@ export function policy(opts: {
       const error = opts.parse(meta.input)
       const retry = retryable(error, opts.provider)
       if (!retry) return Cause.done(meta.attempt)
-      if (meta.attempt > RETRY_MAX_RETRIES) return Cause.done(meta.attempt)
+      // Auto-reconnect hold: while the network monitor reports the machine
+      // offline (a connectivity failure was observed and the probe loop has not
+      // yet recovered), don't burn retry attempts or hit the max-retries cap —
+      // park the schedule on the monitor's probe cadence so we resume on the
+      // first successful probe after the connection returns.
+      if (connectivity() === "offline") {
+        lastParkedAttempt = Math.max(lastParkedAttempt, meta.attempt)
+        return Effect.gen(function* () {
+          const wait = 2_000
+          const now = yield* Clock.currentTimeMillis
+          yield* opts.set({
+            attempt: meta.attempt,
+            message: "Connection lost — waiting for network to return",
+            action: retry.action,
+            next: now + wait,
+          })
+          return [meta.attempt, Duration.millis(wait)] as [number, Duration.Duration]
+        })
+      }
+      // If we just recovered from an offline hold, treat the parked attempts as
+      // paused, not consumed: skips the cap for the step that resumes after the
+      // connection returns so the retry isn't murdered at the moment it can win.
+      const recoveredFromHold = lastParkedAttempt > 0
+      if (recoveredFromHold) lastParkedAttempt = 0
+      if (!recoveredFromHold && meta.attempt > RETRY_MAX_RETRIES) return Cause.done(meta.attempt)
       return Effect.gen(function* () {
         const wait = delay(meta.attempt, SessionV1.APIError.isInstance(error) ? error : undefined)
         const now = yield* Clock.currentTimeMillis

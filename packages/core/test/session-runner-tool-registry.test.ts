@@ -3,6 +3,8 @@ import { Tool } from "@opencode-ai/core/tool/tool"
 import { AgentV2 } from "@opencode-ai/core/agent"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { EventV2 } from "@opencode-ai/core/event"
+import { Hooks } from "@opencode-ai/core/hooks/hooks"
 import { ApplicationTools } from "@opencode-ai/core/tool/application-tools"
 import { SessionV2 } from "@opencode-ai/core/session"
 import { SessionMessage } from "@opencode-ai/core/session/message"
@@ -11,6 +13,7 @@ import { ToolRegistry } from "@opencode-ai/core/tool/registry"
 import { executeTool, settleTool, toolDefinitions } from "./lib/tool"
 import { Cause, Deferred, Effect, Exit, Fiber, Layer, Option, Schema, SchemaGetter, SchemaIssue, Scope } from "effect"
 import { testEffect } from "./lib/effect"
+import { hooksNoop, eventNoop, locationFixed } from "./lib/registry-stubs"
 
 const bounds: ToolOutputStore.BoundInput[] = []
 const retentionFailure = new ToolOutputStore.StorageError({ operation: "write", cause: new Error("disk full") })
@@ -29,11 +32,19 @@ const outputStore = Layer.mock(ToolOutputStore.Service, {
     )
   },
 })
-const registryLayer = AppNodeBuilder.build(ToolRegistry.node, [[ToolOutputStore.node, outputStore]])
+const registryLayer = AppNodeBuilder.build(ToolRegistry.node, [
+  [ToolOutputStore.node, outputStore],
+  [Hooks.node, hooksNoop],
+  [EventV2.node, eventNoop],
+  locationFixed,
+])
 const it = testEffect(registryLayer)
 const integrated = testEffect(
   AppNodeBuilder.build(LayerNode.group([ApplicationTools.node, ToolRegistry.node]), [
     [ToolOutputStore.node, outputStore],
+    [Hooks.node, hooksNoop],
+    [EventV2.node, eventNoop],
+    locationFixed,
   ]),
 )
 const identity = {

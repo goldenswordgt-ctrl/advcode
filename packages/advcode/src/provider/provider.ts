@@ -2036,6 +2036,12 @@ const layer = Layer.effect(
       }
     })
 
+    // Enable the network monitor once the provider layer boots so connectivity
+    // loss during any provider request flags the shared singleton and starts
+    // recovery probing.
+    const { NetworkMonitor } = yield* Effect.promise(() => import("./network-monitor"))
+    NetworkMonitor.enable()
+
     return Service.of({ list, getProvider, getModel, getLanguage, closest, getSmallModel, defaultModel })
   }),
 )

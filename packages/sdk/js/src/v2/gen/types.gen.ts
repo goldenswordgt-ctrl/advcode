@@ -93,6 +93,9 @@ export type Event =
   | EventWorktreeFailed
   | EventServerConnected
   | EventGlobalDisposed
+  | EventToolIntentStart
+  | EventToolIntentEnd
+  | EventSessionActivity
   | EventServerInstanceDisposed
 
 export type QuestionReplied = {
@@ -1600,6 +1603,45 @@ export type GlobalEvent = {
           [key: string]: unknown
         }
       }
+    | {
+        id: string
+        type: "tool.intent.start"
+        properties: {
+          timestamp: number
+          sessionID: string
+          toolCallID: string
+          tool: string
+          input: {
+            [key: string]: unknown
+          }
+          agent: string
+        }
+      }
+    | {
+        id: string
+        type: "tool.intent.end"
+        properties: {
+          timestamp: number
+          sessionID: string
+          toolCallID: string
+          tool: string
+          agent: string
+          resultType: "success" | "error"
+          outputSummary?: string
+        }
+      }
+    | {
+        id: string
+        type: "session.activity"
+        properties: {
+          sessionID: string
+          window?: string
+          agent?: string
+          model?: string
+          status: "idle" | "working" | "streaming" | "waiting" | "suspended"
+          at: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+        }
+      }
     | EventServerInstanceDisposed
     | SyncEventSessionCreated
     | SyncEventSessionUpdated
@@ -1636,6 +1678,8 @@ export type GlobalEvent = {
     | SyncEventSessionNextRevertStaged
     | SyncEventSessionNextRevertCleared
     | SyncEventSessionNextRevertCommitted
+    | SyncEventToolIntentStart
+    | SyncEventToolIntentEnd
 }
 
 /**
@@ -2957,6 +3001,9 @@ export type V2Event =
   | WorktreeFailed
   | ServerConnected
   | GlobalDisposed
+  | ToolIntentStart
+  | ToolIntentEnd
+  | SessionActivity
 
 export type V2EventStream = string
 
@@ -3835,6 +3882,47 @@ export type SyncEventSessionNextRevertCommitted = {
       timestamp: number
       sessionID: string
       messageID: string
+    }
+  }
+}
+
+export type SyncEventToolIntentStart = {
+  type: "sync"
+  id: string
+  syncEvent: {
+    type: "tool.intent.start.1"
+    id: string
+    seq: number
+    aggregateID: string
+    data: {
+      timestamp: number
+      sessionID: string
+      toolCallID: string
+      tool: string
+      input: {
+        [key: string]: unknown
+      }
+      agent: string
+    }
+  }
+}
+
+export type SyncEventToolIntentEnd = {
+  type: "sync"
+  id: string
+  syncEvent: {
+    type: "tool.intent.end.1"
+    id: string
+    seq: number
+    aggregateID: string
+    data: {
+      timestamp: number
+      sessionID: string
+      toolCallID: string
+      tool: string
+      agent: string
+      resultType: "success" | "error"
+      outputSummary?: string
     }
   }
 }
@@ -6121,6 +6209,75 @@ export type GlobalDisposed = {
   }
 }
 
+export type ToolIntentStart = {
+  id: string
+  metadata?: {
+    [key: string]: unknown
+  }
+  type: "tool.intent.start"
+  durable?: {
+    aggregateID: string
+    seq: number
+    version: number
+  }
+  location?: LocationRef
+  data: {
+    timestamp: number
+    sessionID: string
+    toolCallID: string
+    tool: string
+    input: {
+      [key: string]: unknown
+    }
+    agent: string
+  }
+}
+
+export type ToolIntentEnd = {
+  id: string
+  metadata?: {
+    [key: string]: unknown
+  }
+  type: "tool.intent.end"
+  durable?: {
+    aggregateID: string
+    seq: number
+    version: number
+  }
+  location?: LocationRef
+  data: {
+    timestamp: number
+    sessionID: string
+    toolCallID: string
+    tool: string
+    agent: string
+    resultType: "success" | "error"
+    outputSummary?: string
+  }
+}
+
+export type SessionActivity = {
+  id: string
+  metadata?: {
+    [key: string]: unknown
+  }
+  type: "session.activity"
+  durable?: {
+    aggregateID: string
+    seq: number
+    version: number
+  }
+  location?: LocationRef
+  data: {
+    sessionID: string
+    window?: string
+    agent?: string
+    model?: string
+    status: "idle" | "working" | "streaming" | "waiting" | "suspended"
+    at: number | "NaN" | "Infinity" | "-Infinity"
+  }
+}
+
 export type QuestionV2Request = {
   id: string
   sessionID: string
@@ -7065,6 +7222,48 @@ export type EventGlobalDisposed = {
   type: "global.disposed"
   properties: {
     [key: string]: unknown
+  }
+}
+
+export type EventToolIntentStart = {
+  id: string
+  type: "tool.intent.start"
+  properties: {
+    timestamp: number
+    sessionID: string
+    toolCallID: string
+    tool: string
+    input: {
+      [key: string]: unknown
+    }
+    agent: string
+  }
+}
+
+export type EventToolIntentEnd = {
+  id: string
+  type: "tool.intent.end"
+  properties: {
+    timestamp: number
+    sessionID: string
+    toolCallID: string
+    tool: string
+    agent: string
+    resultType: "success" | "error"
+    outputSummary?: string
+  }
+}
+
+export type EventSessionActivity = {
+  id: string
+  type: "session.activity"
+  properties: {
+    sessionID: string
+    window?: string
+    agent?: string
+    model?: string
+    status: "idle" | "working" | "streaming" | "waiting" | "suspended"
+    at: number | "NaN" | "Infinity" | "-Infinity"
   }
 }
 

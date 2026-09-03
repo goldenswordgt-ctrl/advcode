@@ -21,6 +21,7 @@ import { Question } from "./question"
 import { QuestionV1 } from "./question-v1"
 import { Reference } from "./reference"
 import { ServerEvent } from "./server-event"
+import { SessionActivityEvent } from "./session-activity-event"
 import { SessionCompactionEvent } from "./session-compaction-event"
 import { SessionEvent } from "./session-event"
 import { SessionStatusEvent } from "./session-status-event"
@@ -29,6 +30,7 @@ import { SessionV1 } from "./session-v1"
 import { TuiEvent } from "./tui-event"
 import { VcsEvent } from "./vcs-event"
 import { WorkspaceEvent } from "./workspace-event"
+import { ToolIntentEvent } from "./tool-intent-event"
 import { WorktreeEvent } from "./worktree-event"
 
 const sessionV1DurableDefinitions = SessionV1.Event.Definitions.filter((definition) => definition.durable !== undefined)
@@ -58,6 +60,7 @@ export const ServerDefinitions = Event.inventory(
   ...foundationDefinitions,
   ...featureDefinitions,
   ...SessionTodo.Event.Definitions,
+  ...ToolIntentEvent.Definitions,
 )
 
 export const Definitions = Event.inventory(
@@ -79,6 +82,8 @@ export const Definitions = Event.inventory(
   ...WorkspaceEvent.Definitions,
   ...WorktreeEvent.Definitions,
   ...ServerEvent.Definitions,
+  ...ToolIntentEvent.Definitions,
+  ...SessionActivityEvent.Definitions,
 )
 export const Latest = Event.latest(Definitions)
 export { Durable }

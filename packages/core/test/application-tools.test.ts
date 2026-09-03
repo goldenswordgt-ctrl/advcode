@@ -3,6 +3,8 @@ import { Tool } from "@opencode-ai/core/tool/tool"
 import { ApplicationTools } from "@opencode-ai/core/tool/application-tools"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { EventV2 } from "@opencode-ai/core/event"
+import { Hooks } from "@opencode-ai/core/hooks/hooks"
 import { SessionV2 } from "@opencode-ai/core/session"
 import { SessionMessage } from "@opencode-ai/core/session/message"
 import { AgentV2 } from "@opencode-ai/core/agent"
@@ -12,10 +14,14 @@ import { ToolOutputStore } from "@opencode-ai/core/tool-output-store"
 import { Tools } from "@opencode-ai/core/tool/tools"
 import { Deferred, Effect, Exit, Fiber, Schema, Scope } from "effect"
 import { testEffect } from "./lib/effect"
+import { hooksNoop, eventNoop, locationFixed } from "./lib/registry-stubs"
 
 const it = testEffect(
   AppNodeBuilder.build(LayerNode.group([ApplicationTools.node, ToolRegistry.node, ToolRegistry.toolsNode]), [
     [ToolOutputStore.node, ToolOutputStore.nodeWithoutConfig],
+    [Hooks.node, hooksNoop],
+    [EventV2.node, eventNoop],
+    locationFixed,
   ]),
 )
 

@@ -118,6 +118,22 @@ export const dict = {
 
   "home.install.ariaLabel": "Install options",
 
+  "home.config.filename": "opencode.json",
+
+  "home.trusted.label": "Trusted by {{count}}+ developers",
+
+  "home.products.title": "Use OpenCode everywhere",
+  "home.products.body": "OpenCode is an open source AI coding agent available across every surface you work on.",
+  "home.products.terminal.title": "Terminal",
+  "home.products.terminal.body": "The core TUI — where it all started.",
+  "home.products.terminal.link": "Install",
+  "home.products.desktop.title": "Desktop",
+  "home.products.desktop.body": "A native app with tabs, sessions, and more.",
+  "home.products.desktop.link": "Download",
+  "home.products.ide.title": "IDE Extension",
+  "home.products.ide.body": "Works with VS Code and other editors.",
+  "home.products.ide.link": "Learn more",
+
   "home.what.title": "What is OpenCode?",
   "home.what.body": "OpenCode is an open source agent that helps you write code in your terminal, IDE, or desktop.",
   "home.what.lsp.title": "LSP enabled",

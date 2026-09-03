@@ -87,9 +87,10 @@ export type Theme = {
   readonly syntaxOperator: RGBA
   readonly syntaxPunctuation: RGBA
   readonly thinkingOpacity: number
+  readonly animation?: ResolvedAnimation
   _hasSelectedListItemText: boolean
 }
-type ThemeColor = Exclude<keyof Theme, "thinkingOpacity" | "_hasSelectedListItemText">
+type ThemeColor = Exclude<keyof Theme, "thinkingOpacity" | "_hasSelectedListItemText" | "animation">
 export type SyntaxStyleOverrides = Record<string, { italic?: boolean }>
 
 export function selectedForeground(theme: Theme, bg?: RGBA): RGBA {
@@ -117,9 +118,32 @@ type Variant = {
   light: HexColor | RefName
 }
 type ColorValue = HexColor | RefName | Variant | RGBA
+export type AnimationConfig = {
+  /** Colors for the expanding ring animation (2-3 colors that cycle) */
+  flowPalette?: ColorValue[]
+  /** Shimmer accent color for logo highlight sweep */
+  shimmer?: ColorValue
+  /** Speed multiplier (1.0 = default, 2.0 = double speed, 0.5 = half) */
+  speed?: number
+  /** Ring intensity multiplier (1.0 = default, 1.5 = stronger rings) */
+  intensity?: number
+  /** Background breathing color override (defaults to primary) */
+  breathe?: ColorValue
+}
+
+/** Animation config after color resolution — all colors are concrete RGBA */
+export type ResolvedAnimation = {
+  flowPalette?: RGBA[]
+  shimmer?: RGBA
+  speed?: number
+  intensity?: number
+  breathe?: RGBA
+}
+
 export type ThemeJson = {
   $schema?: string
   defs?: Record<string, HexColor | RefName>
+  animation?: AnimationConfig
   theme: Omit<Record<ThemeColor, ColorValue>, "selectedListItemText" | "backgroundMenu"> & {
     selectedListItemText?: ColorValue
     backgroundMenu?: ColorValue
@@ -291,10 +315,23 @@ export function resolveTheme(theme: ThemeJson, mode: "dark" | "light") {
   // Handle thinkingOpacity - optional with default of 0.6
   const thinkingOpacity = theme.theme.thinkingOpacity ?? 0.6
 
+  // Resolve animation config — flow palette colors through the same resolver
+  const rawAnim = theme.animation
+  const animation: ResolvedAnimation = rawAnim
+    ? {
+        flowPalette: rawAnim.flowPalette?.map((c) => resolveColor(c)),
+        shimmer: rawAnim.shimmer ? (resolveColor(rawAnim.shimmer) as RGBA) : undefined,
+        speed: rawAnim.speed,
+        intensity: rawAnim.intensity,
+        breathe: rawAnim.breathe ? (resolveColor(rawAnim.breathe) as RGBA) : undefined,
+      }
+    : {}
+
   return {
     ...resolved,
     _hasSelectedListItemText: hasSelectedListItemText,
     thinkingOpacity,
+    animation,
   } as Theme
 }
 

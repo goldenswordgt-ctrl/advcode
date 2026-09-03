@@ -39,7 +39,10 @@ describe("ConfigSkillPlugin.Plugin", () => {
           skill: { transform, reload: () => Effect.void },
         }),
       ).pipe(
-        Effect.provideService(Global.Service, Global.Service.of({ ...Global.make(), home: "/home/test" })),
+        Effect.provideService(
+          Global.Service,
+          Global.Service.of({ ...Global.make(), home: "/home/test", data: "/data" }),
+        ),
         Effect.provideService(Location.Service, Location.Service.of(location({ directory }))),
         Effect.provideService(
           Config.Service,
@@ -59,6 +62,10 @@ describe("ConfigSkillPlugin.Plugin", () => {
       )
 
       expect(sources).toEqual([
+        SkillV2.DirectorySource.make({
+          type: "directory",
+          path: AbsolutePath.make(path.join("/data", "skills", "learned")),
+        }),
         SkillV2.DirectorySource.make({
           type: "directory",
           path: AbsolutePath.make(path.join("/repo/.opencode", "skill")),

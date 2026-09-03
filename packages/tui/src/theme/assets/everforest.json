@@ -237,5 +237,12 @@
       "dark": "darkStep12",
       "light": "lightStep12"
     }
+  },
+  "animation": {
+    "flowPalette": ["darkStep9", "darkCyan", "darkYellow"],
+    "shimmer": "darkGreen",
+    "speed": 1.0,
+    "intensity": 1.0,
+    "breathe": "darkStep9"
   }
 }

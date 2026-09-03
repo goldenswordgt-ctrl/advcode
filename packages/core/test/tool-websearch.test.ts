@@ -4,6 +4,8 @@ import { HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { LayerNodePlatform } from "@opencode-ai/core/effect/app-node-platform"
+import { EventV2 } from "@opencode-ai/core/event"
+import { Hooks } from "@opencode-ai/core/hooks/hooks"
 import { PermissionV2 } from "@opencode-ai/core/permission"
 import { SessionV2 } from "@opencode-ai/core/session"
 import { ToolRegistry } from "@opencode-ai/core/tool/registry"
@@ -11,6 +13,7 @@ import { WebSearchTool } from "@opencode-ai/core/tool/websearch"
 import { ToolOutputStore } from "@opencode-ai/core/tool-output-store"
 import { testEffect } from "./lib/effect"
 import { toolIdentity, executeTool, settleTool, toolDefinitions } from "./lib/tool"
+import { hooksNoop, eventNoop, locationFixed } from "./lib/registry-stubs"
 
 const sessionID = SessionV2.ID.make("ses_websearch_test")
 const payload = (text: string) =>
@@ -131,6 +134,9 @@ const it = testEffect(
       [LayerNodePlatform.httpClient, http],
       [WebSearchTool.configNode, websearchConfig],
       [ToolOutputStore.node, ToolOutputStore.nodeWithoutConfig],
+      [Hooks.node, hooksNoop],
+      [EventV2.node, eventNoop],
+      locationFixed,
     ],
   ),
 )

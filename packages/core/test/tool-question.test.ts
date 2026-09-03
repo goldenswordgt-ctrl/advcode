@@ -3,6 +3,8 @@ import { Effect, Exit, Fiber, Layer } from "effect"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { PermissionV2 } from "@opencode-ai/core/permission"
+import { EventV2 } from "@opencode-ai/core/event"
+import { Hooks } from "@opencode-ai/core/hooks/hooks"
 import { QuestionV2 } from "@opencode-ai/core/question"
 import { SessionV2 } from "@opencode-ai/core/session"
 import { ToolRegistry } from "@opencode-ai/core/tool/registry"
@@ -10,6 +12,7 @@ import { QuestionTool } from "@opencode-ai/core/tool/question"
 import { ToolOutputStore } from "@opencode-ai/core/tool-output-store"
 import { testEffect } from "./lib/effect"
 import { toolIdentity, executeTool, settleTool, toolDefinitions } from "./lib/tool"
+import { hooksNoop, eventNoop, locationFixed } from "./lib/registry-stubs"
 
 const sessionID = SessionV2.ID.make("ses_question_tool_test")
 const assertions: PermissionV2.AssertInput[] = []
@@ -48,6 +51,9 @@ const it = testEffect(
     [PermissionV2.node, permission],
     [QuestionV2.node, question],
     [ToolOutputStore.node, ToolOutputStore.nodeWithoutConfig],
+    [Hooks.node, hooksNoop],
+    [EventV2.node, eventNoop],
+    locationFixed,
   ]),
 )
 

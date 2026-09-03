@@ -4,6 +4,7 @@ import { Database } from "@opencode-ai/core/database/database"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { EventV2 } from "@opencode-ai/core/event"
+import { Hooks } from "@opencode-ai/core/hooks/hooks"
 import { PermissionV2 } from "@opencode-ai/core/permission"
 import { Project } from "@opencode-ai/core/project"
 import { ProjectTable } from "@opencode-ai/core/project/sql"
@@ -16,6 +17,7 @@ import { ToolRegistry } from "@opencode-ai/core/tool/registry"
 import { ToolOutputStore } from "@opencode-ai/core/tool-output-store"
 import { testEffect } from "./lib/effect"
 import { toolIdentity, executeTool, settleTool, toolDefinitions } from "./lib/tool"
+import { hooksNoop, locationFixed } from "./lib/registry-stubs"
 
 const sessionID = SessionV2.ID.make("ses_todowrite_tool_test")
 const assertions: PermissionV2.AssertInput[] = []
@@ -48,6 +50,8 @@ const it = testEffect(
     [
       [PermissionV2.node, permission],
       [ToolOutputStore.node, ToolOutputStore.nodeWithoutConfig],
+      [Hooks.node, hooksNoop],
+      locationFixed,
     ],
   ),
 )

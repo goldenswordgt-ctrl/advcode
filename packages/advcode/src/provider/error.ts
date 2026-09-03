@@ -3,6 +3,7 @@ import { STATUS_CODES } from "http"
 import { iife } from "@/util/iife"
 import type { ProviderV2 } from "@opencode-ai/core/provider"
 import { isContextOverflow } from "@opencode-ai/llm"
+import { isConnectivityFailure, reportNetworkError } from "./network-monitor"
 
 export class HeaderTimeoutError extends Error {
   public override readonly name = "ProviderHeaderTimeoutError"
@@ -178,6 +179,13 @@ export function parseAPICallError(input: { providerID: ProviderV2.ID; error: API
       message: m,
       responseBody: input.error.responseBody,
     }
+  }
+
+  // Connectivity failures (DNS, connection refused/reset, fetch failed) shouldn't
+  // consume retries into a dead wire — flag the monitor so it probes for recovery
+  // and other providers/windows learn the network is down.
+  if (!input.error.statusCode && isConnectivityFailure(input.error.cause ?? input.error.message)) {
+    reportNetworkError({ cause: input.error.cause ?? m, providerID: input.providerID })
   }
 
   const metadata = input.error.url ? { url: input.error.url } : undefined
