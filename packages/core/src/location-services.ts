@@ -29,6 +29,8 @@ import { SessionRunnerModel } from "./session/runner/model"
 import { SessionTodo } from "./session/todo"
 import { SkillV2 } from "./skill"
 import { SkillGuidance } from "./skill/guidance"
+import { RepoMap } from "./repo-map/repo-map"
+import { RepoMapGuidance } from "./repo-map/guidance"
 import { SkillLearning } from "./skill/learning"
 import { SelfLearning } from "./skill/self-learn"
 import { MemoryV2 } from "./memory/memory"
@@ -70,6 +72,8 @@ export const locationServices = LayerNode.group([
   BotMode.node,
   BotRunner.node,
   SkillGuidance.node,
+  RepoMap.node,
+  RepoMapGuidance.node,
   SystemContextRegistry.node,
   SystemContextBuiltIns.node,
   MemoryContext.node,
