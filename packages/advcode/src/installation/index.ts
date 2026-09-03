@@ -123,8 +123,10 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
     )
 
     const getBrewFormula = Effect.fnUntraced(function* () {
-      const tapFormula = yield* text(["brew", "list", "--formula", "anomalyco/tap/opencode"])
-      if (tapFormula.includes("opencode")) return "anomalyco/tap/opencode"
+      const tapFormula = yield* text(["brew", "list", "--formula", "goldenswordgt-ctrl/advcode/advcode"])
+      if (tapFormula.includes("advcode")) return "goldenswordgt-ctrl/advcode/advcode"
+      const opencodeTap = yield* text(["brew", "list", "--formula", "anomalyco/tap/opencode"])
+      if (opencodeTap.includes("opencode")) return "anomalyco/tap/opencode"
       const coreFormula = yield* text(["brew", "list", "--formula", "opencode"])
       if (coreFormula.includes("opencode")) return "opencode"
       return "opencode"
@@ -181,7 +183,10 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
           { name: "yarn", command: () => text(["yarn", "global", "list"]) },
           { name: "pnpm", command: () => text(["pnpm", "list", "-g", "--depth=0"]) },
           { name: "bun", command: () => text(["bun", "pm", "ls", "-g"]) },
-          { name: "brew", command: () => text(["brew", "list", "--formula", "opencode"]) },
+          {
+            name: "brew",
+            command: () => text(["brew", "list", "--formula", "goldenswordgt-ctrl/advcode/advcode", "opencode"]),
+          },
           { name: "scoop", command: () => text(["scoop", "list", "opencode"]) },
           { name: "choco", command: () => text(["choco", "list", "--limit-output", "opencode"]) },
         ]
@@ -198,7 +203,7 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
           const output = yield* check.command()
           const installedNames =
             check.name === "brew" || check.name === "choco" || check.name === "scoop"
-              ? ["opencode"]
+              ? ["opencode", "advcode"]
               : ["advcode", "@advcode/cli"]
           if (installedNames.some((name) => output.includes(name))) {
             return check.name

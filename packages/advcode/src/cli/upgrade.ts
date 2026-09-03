@@ -8,6 +8,10 @@ import { GlobalBus } from "@/bus/global"
 export async function upgrade() {
   const config = await AppRuntime.runPromise(Config.Service.use((cfg) => cfg.getGlobal()))
   if (config.autoupdate === false || Flag.OPENCODE_DISABLE_AUTOUPDATE) return
+  // Dev/preview builds (0.0.0-<channel>-<timestamp>) have no real semver to compare, so any
+  // release would look "newer" and fire a spurious update popup. self-managed builds (homebrew
+  // tap, local dev) skip the notify check entirely.
+  if (InstallationVersion.startsWith("0.0.0-")) return
   const method = await Installation.method()
   const latest = await Installation.latest(method).catch(() => {})
   if (!latest) return
