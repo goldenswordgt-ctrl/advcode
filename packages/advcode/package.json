@@ -16,7 +16,8 @@
     "dev:temporary": "bun run ./src/temporary.ts"
   },
   "bin": {
-    "advcode": "./bin/advcode"
+    "advcode": "./bin/advcode",
+    "advcall": "./bin/advcall"
   },
   "exports": {
     "./*": "./src/*.ts"

@@ -29,7 +29,8 @@ jobs:
           mkdir -p release
           cp packages/advcode/dist/advcode-darwin-arm64/bin/advcode release/advcode
           chmod 755 release/advcode
-          tar -czf advcode-darwin-arm64.tar.gz -C release advcode
+          ln -s advcode release/advcall
+          tar -czf advcode-darwin-arm64.tar.gz -C release advcode advcall
           echo "SHA=$(shasum -a 256 advcode-darwin-arm64.tar.gz | awk '{print $1}')" >> $GITHUB_ENV
           echo "SIZE=$(stat -f%z advcode-darwin-arm64.tar.gz)" >> $GITHUB_ENV
 
@@ -52,6 +53,9 @@ jobs:
             Formula/advcode.rb
           sed -i '' "s|sha256 \"[a-f0-9]\{64\}\"|sha256 \"${{ env.SHA }}\"|" Formula/advcode.rb
           sed -i '' "s|version \"[^\"]*\"|version \"${GITHUB_REF_NAME#v}\"|" Formula/advcode.rb
+          grep -q 'bin.install_symlink "advcode" => "advcall"' Formula/advcode.rb || \
+            sed -i '' '/bin\.install "advcode"/a\
+            bin.install_symlink "advcode" => "advcall"' Formula/advcode.rb
           git config user.email "advcode-bot@users.noreply.github.com"
           git config user.name "advcode-bot"
           git add Formula/advcode.rb
