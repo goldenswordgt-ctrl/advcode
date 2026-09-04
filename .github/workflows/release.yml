@@ -24,13 +24,21 @@ jobs:
           bun install
           bun run --cwd packages/advcode build --single
 
+      - name: Build native AdvCall browser
+        run: |
+          cd packages/advcall-native
+          chmod +x build.sh
+          ./build.sh
+
       - name: Package tarball
         run: |
           mkdir -p release
           cp packages/advcode/dist/advcode-darwin-arm64/bin/advcode release/advcode
           chmod 755 release/advcode
-          ln -s advcode release/advcall
-          tar -czf advcode-darwin-arm64.tar.gz -C release advcode advcall
+          cp packages/advcode/bin/advcall release/advcall
+          chmod 755 release/advcall
+          cp -R packages/advcall-native/build/AdvCall.app release/AdvCall.app
+          tar -czf advcode-darwin-arm64.tar.gz -C release advcode advcall AdvCall.app
           echo "SHA=$(shasum -a 256 advcode-darwin-arm64.tar.gz | awk '{print $1}')" >> $GITHUB_ENV
           echo "SIZE=$(stat -f%z advcode-darwin-arm64.tar.gz)" >> $GITHUB_ENV
 
@@ -53,9 +61,18 @@ jobs:
             Formula/advcode.rb
           sed -i '' "s|sha256 \"[a-f0-9]\{64\}\"|sha256 \"${{ env.SHA }}\"|" Formula/advcode.rb
           sed -i '' "s|version \"[^\"]*\"|version \"${GITHUB_REF_NAME#v}\"|" Formula/advcode.rb
-          grep -q 'bin.install_symlink "advcode" => "advcall"' Formula/advcode.rb || \
+          # Replace advcall symlink with the real launcher script
+          grep -q 'bin.install "advcall"' Formula/advcode.rb || {
+            sed -i '' '/bin\.install_symlink "advcode" => "advcall"/d' Formula/advcode.rb
             sed -i '' '/bin\.install "advcode"/a\
-            bin.install_symlink "advcode" => "advcall"' Formula/advcode.rb
+            bin.install "advcall"' Formula/advcode.rb
+          }
+          # Install AdvCall.app next to the bin scripts so the launcher finds it
+          grep -q 'prefix.install "AdvCall.app"' Formula/advcode.rb || \
+            sed -i '' '/bin\.install "advcall"/a\
+            (prefix/"bin").install "AdvCall.app"' Formula/advcode.rb
+          # Fix test block: advcall is no longer a symlink to advcode
+          sed -i '' 's|assert_equal File.realpath("#{bin}/advcode"), File.realpath("#{bin}/advcall")|assert_path_exists "#{prefix}/bin/AdvCall.app/Contents/MacOS/AdvCall"|' Formula/advcode.rb
           git config user.email "advcode-bot@users.noreply.github.com"
           git config user.name "advcode-bot"
           git add Formula/advcode.rb

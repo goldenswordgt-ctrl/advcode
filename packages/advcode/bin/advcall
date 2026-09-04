@@ -1,14 +1,23 @@
 #!/usr/bin/env node
 
+/**
+ * advcall — native WKWebView browser launcher.
+ *
+ * Locates AdvCall.app relative to this script (bundled in the release tarball
+ * or installed via Homebrew) and launches it. Falls back to advcode if the
+ * native app is not found.
+ *
+ * Usage: advcall [url]
+ */
+
 const childProcess = require("child_process")
 const fs = require("fs")
 const path = require("path")
-const os = require("os")
 
 const forwardedSignals = ["SIGINT", "SIGTERM", "SIGHUP"]
 
-function run(target) {
-  const child = childProcess.spawn(target, process.argv.slice(2), {
+function run(target, args) {
+  const child = childProcess.spawn(target, args, {
     stdio: "inherit",
   })
 
@@ -43,157 +52,144 @@ function run(target) {
   })
 }
 
-const envPath = process.env.ADVCODE_BIN_PATH
+// --- Locate AdvCall.app ---
 
 const scriptPath = fs.realpathSync(__filename)
 const scriptDir = path.dirname(scriptPath)
 
-//
-const cached = path.join(scriptDir, ".advcode")
+// Candidate locations for AdvCall.app, in priority order
+const candidates = [
+  // Bundled in the release tarball (sibling to bin/)
+  path.join(scriptDir, "..", "AdvCall.app"),
+  // Adjacent to the script (dev / manual install)
+  path.join(scriptDir, "AdvCall.app"),
+  // npm workspace: packages/advcall-native/ relative to packages/advcode/
+  path.join(scriptDir, "..", "..", "advcall-native", "AdvCall.app"),
+  // User's home standard location
+  path.join(process.env.HOME || "", "Applications", "AdvCall.app"),
+  // System-wide
+  "/Applications/AdvCall.app",
+]
 
-const platformMap = {
-  darwin: "darwin",
-  linux: "linux",
-  win32: "windows",
-}
-const archMap = {
-  x64: "x64",
-  arm64: "arm64",
-  arm: "arm",
+let appPath = null
+for (const candidate of candidates) {
+  if (fs.existsSync(candidate)) {
+    appPath = candidate
+    break
+  }
 }
 
-let platform = platformMap[os.platform()]
-if (!platform) {
-  platform = os.platform()
-}
-let arch = archMap[os.arch()]
-if (!arch) {
-  arch = os.arch()
-}
-const base = "advcode-" + platform + "-" + arch
-const binary = platform === "windows" ? "advcode.exe" : "advcode"
+if (appPath) {
+  // Launch the native browser via `open` (macOS) or direct exec
+  const url = process.argv[2]
+  const args = url ? [appPath, "--args", url] : [appPath]
 
-function supportsAvx2() {
-  if (arch !== "x64") return false
-
-  if (platform === "linux") {
-    try {
-      return /(^|\s)avx2(\s|$)/i.test(fs.readFileSync("/proc/cpuinfo", "utf8"))
-    } catch {
-      return false
+  if (process.platform === "darwin") {
+    // Use `open` on macOS for proper .app launch
+    const openArgs = url ? ["-a", appPath, url] : ["-a", appPath]
+    run("open", openArgs)
+  } else {
+    // Fallback: try to exec the binary inside the .app bundle
+    const innerBin = path.join(appPath, "Contents", "MacOS", "AdvCall")
+    if (fs.existsSync(innerBin)) {
+      const execArgs = url ? [url] : []
+      run(innerBin, execArgs)
+    } else {
+      console.error("advcall: AdvCall.app found but binary missing inside bundle")
+      process.exit(1)
     }
   }
+} else {
+  // Fallback: run advcode (the old behavior)
+  const envPath = process.env.ADVCODE_BIN_PATH
+  const cached = path.join(scriptDir, ".advcode")
 
-  if (platform === "darwin") {
-    try {
-      const result = childProcess.spawnSync("sysctl", ["-n", "hw.optional.avx2_0"], {
-        encoding: "utf8",
-        timeout: 1500,
-      })
-      if (result.status !== 0) return false
-      return (result.stdout || "").trim() === "1"
-    } catch {
-      return false
-    }
-  }
+  const platformMap = { darwin: "darwin", linux: "linux", win32: "windows" }
+  const archMap = { x64: "x64", arm64: "arm64", arm: "arm" }
 
-  if (platform === "windows") {
-    const cmd =
-      '(Add-Type -MemberDefinition "[DllImport(""kernel32.dll"")] public static extern bool IsProcessorFeaturePresent(int ProcessorFeature);" -Name Kernel32 -Namespace Win32 -PassThru)::IsProcessorFeaturePresent(40)'
+  let platform = platformMap[process.platform] || process.platform
+  let arch = archMap[process.arch] || process.arch
+  const base = "advcode-" + platform + "-" + arch
+  const binary = platform === "windows" ? "advcode.exe" : "advcode"
 
-    for (const exe of ["powershell.exe", "pwsh.exe", "pwsh", "powershell"]) {
+  function supportsAvx2() {
+    if (arch !== "x64") return false
+    if (platform === "linux") {
       try {
-        const result = childProcess.spawnSync(exe, ["-NoProfile", "-NonInteractive", "-Command", cmd], {
-          encoding: "utf8",
-          timeout: 3000,
-          windowsHide: true,
-        })
-        if (result.status !== 0) continue
-        const out = (result.stdout || "").trim().toLowerCase()
-        if (out === "true" || out === "1") return true
-        if (out === "false" || out === "0") return false
+        return /(^|\s)avx2(\s|$)/i.test(fs.readFileSync("/proc/cpuinfo", "utf8"))
       } catch {
-        continue
+        return false
       }
     }
-
+    if (platform === "darwin") {
+      try {
+        const result = childProcess.spawnSync("sysctl", ["-n", "hw.optional.avx2_0"], {
+          encoding: "utf8",
+          timeout: 1500,
+        })
+        if (result.status !== 0) return false
+        return (result.stdout || "").trim() === "1"
+      } catch {
+        return false
+      }
+    }
     return false
   }
 
-  return false
-}
-
-const names = (() => {
   const avx2 = supportsAvx2()
   const baseline = arch === "x64" && !avx2
-
+  let names
   if (platform === "linux") {
     const musl = (() => {
       try {
         if (fs.existsSync("/etc/alpine-release")) return true
-      } catch {
-        // ignore
-      }
-
+      } catch {}
       try {
         const result = childProcess.spawnSync("ldd", ["--version"], { encoding: "utf8" })
         const text = ((result.stdout || "") + (result.stderr || "")).toLowerCase()
         if (text.includes("musl")) return true
-      } catch {
-        // ignore
-      }
-
+      } catch {}
       return false
     })()
-
     if (musl) {
-      if (arch === "x64") {
-        if (baseline) return [`${base}-baseline-musl`, `${base}-musl`, `${base}-baseline`, base]
-        return [`${base}-musl`, `${base}-baseline-musl`, base, `${base}-baseline`]
+      names = arch === "x64"
+        ? (baseline ? [`${base}-baseline-musl`, `${base}-musl`, `${base}-baseline`, base] : [`${base}-musl`, `${base}-baseline-musl`, base, `${base}-baseline`])
+        : [`${base}-musl`, base]
+    } else {
+      names = arch === "x64"
+        ? (baseline ? [`${base}-baseline`, base, `${base}-baseline-musl`, `${base}-musl`] : [base, `${base}-baseline`, `${base}-musl`, `${base}-baseline-musl`])
+        : [base, `${base}-musl`]
+    }
+  } else if (arch === "x64") {
+    names = baseline ? [`${base}-baseline`, base] : [base, `${base}-baseline`]
+  } else {
+    names = [base]
+  }
+
+  function findBinary(startDir) {
+    let current = startDir
+    for (;;) {
+      const modules = path.join(current, "node_modules")
+      if (fs.existsSync(modules)) {
+        for (const name of names) {
+          const candidate = path.join(modules, name, "bin", binary)
+          if (fs.existsSync(candidate)) return candidate
+        }
       }
-      return [`${base}-musl`, base]
+      const parent = path.dirname(current)
+      if (parent === current) return
+      current = parent
     }
-
-    if (arch === "x64") {
-      if (baseline) return [`${base}-baseline`, base, `${base}-baseline-musl`, `${base}-musl`]
-      return [base, `${base}-baseline`, `${base}-musl`, `${base}-baseline-musl`]
-    }
-    return [base, `${base}-musl`]
   }
 
-  if (arch === "x64") {
-    if (baseline) return [`${base}-baseline`, base]
-    return [base, `${base}-baseline`]
+  const resolved = envPath || (fs.existsSync(cached) ? cached : findBinary(scriptDir))
+  if (!resolved) {
+    console.error(
+      "advcall: AdvCall.app not found and advcode binary not found. " +
+        "Install advcode or place AdvCall.app next to this script."
+    )
+    process.exit(1)
   }
-  return [base]
-})()
 
-function findBinary(startDir) {
-  let current = startDir
-  for (;;) {
-    const modules = path.join(current, "node_modules")
-    if (fs.existsSync(modules)) {
-      for (const name of names) {
-        const candidate = path.join(modules, name, "bin", binary)
-        if (fs.existsSync(candidate)) return candidate
-      }
-    }
-    const parent = path.dirname(current)
-    if (parent === current) {
-      return
-    }
-    current = parent
-  }
+  run(resolved, process.argv.slice(2))
 }
-
-const resolved = envPath || (fs.existsSync(cached) ? cached : findBinary(scriptDir))
-if (!resolved) {
-  console.error(
-    "It seems that your package manager failed to install the right version of the advcode CLI for your platform. You can try manually installing " +
-      names.map((n) => `"${n}"`).join(" or ") +
-      " package",
-  )
-  process.exit(1)
-}
-
-run(resolved)
