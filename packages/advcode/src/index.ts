@@ -41,6 +41,8 @@ import { BrowserCommand } from "./cli/cmd/browser"
 import { CurateCommand } from "./cli/cmd/curate"
 import { AfkCommand } from "./cli/cmd/afk"
 import { TranscriptListCommand, TranscriptGetCommand } from "./cli/cmd/transcript"
+import { WorktreeCommand } from "./cli/cmd/worktree"
+import { CheckpointCommand } from "./cli/cmd/checkpoint"
 import { Heap } from "./cli/heap"
 
 const args = hideBin(process.argv)
@@ -133,6 +135,8 @@ const cli = yargs(args)
   .command(BrowserCommand)
   .command(CurateCommand)
   .command(AfkCommand)
+  .command(WorktreeCommand)
+  .command(CheckpointCommand)
   .command({
     command: "transcript",
     describe: "manage session transcripts",

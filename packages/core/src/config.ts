@@ -61,6 +61,12 @@ export class Info extends Schema.Class<Info>("Config.Info")({
   permissions: Permission.Ruleset.pipe(Schema.optional).annotate({
     description: "Ordered tool permission rules applied to agent tool use",
   }),
+  sandbox: Schema.Literals(["read-only", "workspace-write", "full"])
+    .pipe(Schema.optional)
+    .annotate({
+      description:
+        "Sandbox mode governing what the agent may touch. read-only denies all edit/write/bash tools; workspace-write allows edits only inside the project worktree; full (default) is unrestricted.",
+    }),
   agents: Schema.Record(Schema.String, ConfigAgent.Info).pipe(Schema.optional).annotate({
     description: "Named built-in agent overrides and custom agent definitions",
   }),

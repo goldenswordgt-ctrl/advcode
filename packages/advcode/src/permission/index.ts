@@ -6,6 +6,7 @@ import { Deferred, Effect, Layer, Context } from "effect"
 import os from "os"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { EventV2Bridge } from "@/event-v2-bridge"
+import { Config } from "@/config/config"
 
 export const Event = PermissionV1.Event
 
@@ -37,12 +38,41 @@ export function evaluate(permission: string, pattern: string, ...rulesets: Permi
   )
 }
 
+/**
+ * Build a ruleset that enforces a sandbox mode. The mode rules are meant to be
+ * evaluated last (so they win via `findLast`), which makes them authoritative
+ * over both the configured ruleset and any user approval.
+ *
+ * - read-only: deny every tool that can mutate state (edit/write/apply_patch/bash).
+ * - workspace-write: allow in-worktree edits but deny out-of-worktree access.
+ * - full: no sandbox rules (returns an empty ruleset).
+ */
+export function fromMode(mode: "read-only" | "workspace-write" | "full" | undefined): PermissionV1.Ruleset {
+  if (mode === "read-only") {
+    return [
+      { permission: "edit", pattern: "*", action: "deny" },
+      { permission: "bash", pattern: "*", action: "deny" },
+    ]
+  }
+  if (mode === "workspace-write") {
+    return [
+      {
+        permission: "external_directory",
+        pattern: "*",
+        action: "deny",
+      },
+    ]
+  }
+  return []
+}
+
 export class Service extends Context.Service<Service, Interface>()("@opencode/Permission") {}
 
 const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const events = yield* EventV2Bridge.Service
+    const config = yield* Config.Service
     const state = yield* InstanceState.make<State>(
       Effect.fn("Permission.state")(function* (ctx) {
         void ctx
@@ -67,10 +97,16 @@ const layer = Layer.effect(
     const ask = Effect.fn("Permission.ask")(function* (input: PermissionV1.AskInput) {
       const { approved, pending } = yield* InstanceState.get(state)
       const { ruleset, ...request } = input
+      const mode = yield* config.get().pipe(
+        Effect.map((cfg) => cfg.sandbox),
+        Effect.catch(() => Effect.succeed(undefined)),
+      )
+      const sandbox = fromMode(mode)
       let needsAsk = false
 
       for (const pattern of request.patterns) {
-        const rule = evaluate(request.permission, pattern, ruleset, approved)
+        // `sandbox` is evaluated last so the mode wins over config and approvals.
+        const rule = evaluate(request.permission, pattern, ruleset, approved, sandbox)
         yield* Effect.logInfo("evaluated", { permission: request.permission, pattern, action: rule })
         if (rule.action === "deny") {
           return yield* new PermissionV1.DeniedError({
@@ -218,6 +254,6 @@ export function visibleTools<T>(tools: Record<string, T>, ruleset: PermissionV1.
   return Object.fromEntries(Object.entries(tools).filter(([name]) => !hidden.has(name)))
 }
 
-export const node = LayerNode.make({ service: Service, layer: layer, deps: [EventV2Bridge.node] })
+export const node = LayerNode.make({ service: Service, layer: layer, deps: [EventV2Bridge.node, Config.node] })
 
 export * as Permission from "."

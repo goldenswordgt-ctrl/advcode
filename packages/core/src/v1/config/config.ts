@@ -53,6 +53,10 @@ export const Info = Schema.Struct({
     description:
       "Enable or disable snapshot tracking. When false, filesystem snapshots are not recorded and undoing or reverting will not undo/redo file changes. Defaults to true.",
   }),
+  sandbox: Schema.optional(Schema.Literals(["read-only", "workspace-write", "full"])).annotate({
+    description:
+      "Sandbox mode governing what the agent may touch. read-only denies all edit/write/bash tools; workspace-write allows edits only inside the project worktree; full (default) is unrestricted.",
+  }),
   plugin: Schema.optional(Schema.mutable(Schema.Array(ConfigPluginV1.Spec))),
   share: Schema.optional(Schema.Literals(["manual", "auto", "disabled"])).annotate({
     description:
