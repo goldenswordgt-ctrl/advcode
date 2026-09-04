@@ -1,6 +1,7 @@
 export * as PermissionV2 from "./permission"
 
 import { makeLocationNode } from "./effect/app-node"
+import { Config } from "./config"
 import { Context, Deferred, Effect as EffectRuntime, Layer, Schema } from "effect"
 import { Permission } from "@opencode-ai/schema/permission"
 import { EventV2 } from "./event"
@@ -13,6 +14,19 @@ import { PermissionSaved } from "./permission/saved"
 
 export { Effect, Rule, Ruleset } from "@opencode-ai/schema/permission"
 const missingAgentPermissions: Permission.Ruleset = [{ action: "*", resource: "*", effect: "deny" }]
+
+function fromMode(mode: "read-only" | "workspace-write" | "full" | undefined): Permission.Ruleset {
+  if (mode === "read-only") {
+    return [
+      { action: "edit", resource: "*", effect: "deny" },
+      { action: "bash", resource: "*", effect: "deny" },
+    ]
+  }
+  if (mode === "workspace-write") {
+    return [{ action: "external_directory", resource: "*", effect: "deny" }]
+  }
+  return []
+}
 
 export const ID = Permission.ID
 export type ID = typeof ID.Type
@@ -110,6 +124,7 @@ const layer = Layer.effect(
   Service,
   EffectRuntime.gen(function* () {
     const events = yield* EventV2.Service
+    const config = yield* Config.Service
     const location = yield* Location.Service
     const agents = yield* AgentV2.Service
     const sessions = yield* SessionStore.Service
@@ -153,9 +168,12 @@ const layer = Layer.effect(
     }
 
     const evaluateInput = EffectRuntime.fnUntraced(function* (input: AssertInput) {
+      const entries = yield* config.entries()
+      const sandbox = Config.latest(entries, "sandbox") as "read-only" | "workspace-write" | "full" | undefined
+      const sandboxRules = fromMode(sandbox)
       const rules = yield* configured(input.sessionID, input.agent)
-      if (denied(input, rules)) return { effect: "deny" as const, rules }
-      const all = [...rules, ...(yield* savedRules())]
+      if (denied(input, rules) && sandboxRules.length === 0) return { effect: "deny" as const, rules }
+      const all = [...rules, ...(yield* savedRules()), ...sandboxRules]
       const effects = input.resources.map((resource) => evaluate(input.action, resource, all).effect)
       const effect: Permission.Effect = effects.includes("deny") ? "deny" : effects.includes("ask") ? "ask" : "allow"
       return { effect, rules: all }
@@ -306,5 +324,5 @@ export const locationLayer = layer.pipe(Layer.provideMerge(AgentV2.locationLayer
 export const node = makeLocationNode({
   service: Service,
   layer,
-  deps: [EventV2.node, Location.node, AgentV2.node, SessionStore.node, PermissionSaved.node],
+  deps: [EventV2.node, Config.node, Location.node, AgentV2.node, SessionStore.node, PermissionSaved.node],
 })
