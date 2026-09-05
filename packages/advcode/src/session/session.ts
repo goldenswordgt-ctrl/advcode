@@ -73,6 +73,7 @@ export function fromRow(row: SessionRow): Info {
         partID: row.revert.partID ? PartID.make(row.revert.partID) : undefined,
         snapshot: row.revert.snapshot,
         diff: row.revert.diff,
+        mode: row.revert.mode,
       }
     : undefined
   return {
@@ -148,6 +149,7 @@ export function toRow(info: Info) {
           partID: info.revert.partID,
           snapshot: info.revert.snapshot,
           diff: info.revert.diff,
+          mode: info.revert.mode,
         }
       : null,
     permission: info.permission,
@@ -211,6 +213,7 @@ const Revert = Schema.Struct({
   partID: optional(PartID),
   snapshot: optional(Schema.String),
   diff: optional(Schema.String),
+  mode: optional(Schema.Literals(["code", "convo", "both"])),
 })
 
 const Model = Schema.Struct({

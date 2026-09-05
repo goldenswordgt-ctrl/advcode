@@ -4308,6 +4308,7 @@ export class Session2 extends HeyApiClient {
       workspace?: string
       messageID?: string
       partID?: string
+      mode?: "code" | "convo" | "both"
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -4321,6 +4322,7 @@ export class Session2 extends HeyApiClient {
             { in: "query", key: "workspace" },
             { in: "body", key: "messageID" },
             { in: "body", key: "partID" },
+            { in: "body", key: "mode" },
           ],
         },
       ],

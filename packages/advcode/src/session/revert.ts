@@ -14,6 +14,7 @@ export const RevertInput = Schema.Struct({
   sessionID: SessionID,
   messageID: MessageID,
   partID: Schema.optional(PartID),
+  mode: Schema.optional(Schema.Literals(["code", "convo", "both"])),
 })
 export type RevertInput = Schema.Schema.Type<typeof RevertInput>
 
@@ -67,15 +68,30 @@ const layer = Layer.effect(
 
       if (!rev) return session
 
-      rev.snapshot = session.revert?.snapshot ?? (yield* snap.track())
-      if (session.revert?.snapshot) yield* snap.restore(session.revert.snapshot)
-      yield* snap.revert(patches)
-      if (rev.snapshot) rev.diff = yield* snap.diff(rev.snapshot)
+      const mode = input.mode ?? "both"
+
+      // "convo" mode rolls back the conversation only: skip file snapshots so
+      // the working tree keeps every change the agent made.
+      if (mode !== "convo") {
+        rev.snapshot = session.revert?.snapshot ?? (yield* snap.track())
+        if (session.revert?.snapshot) yield* snap.restore(session.revert.snapshot)
+        yield* snap.revert(patches)
+        if (rev.snapshot) rev.diff = yield* snap.diff(rev.snapshot)
+      }
+
       const index = all.findIndex((msg) => msg.info.id === rev.messageID)
       const range = index < 0 ? [] : all.slice(index)
       const diffs = yield* summary.computeDiff({ messages: range })
       yield* storage.write(["session_diff", input.sessionID], diffs).pipe(Effect.ignore)
       yield* events.publish(Session.Event.Diff, { sessionID: input.sessionID, diff: diffs })
+
+      // "code" mode restores the filesystem only: no revert boundary, so the
+      // conversation is left intact and there is nothing to unrevert later.
+      if (mode === "code") {
+        return yield* sessions.get(input.sessionID).pipe(Effect.orDie)
+      }
+
+      rev.mode = mode
       yield* sessions.setRevert({
         sessionID: input.sessionID,
         revert: rev,

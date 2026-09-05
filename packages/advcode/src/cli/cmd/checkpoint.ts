@@ -41,10 +41,7 @@ export const CheckpointListCommand = effectCmd({
     const sessions = yield* Session.Service
     const sessionID = SessionID.make(args.sessionID)
     const [session, messages] = yield* Effect.all(
-      [
-        sessions.get(sessionID).pipe(Effect.orDie),
-        sessions.messages({ sessionID }).pipe(Effect.orDie),
-      ],
+      [sessions.get(sessionID).pipe(Effect.orDie), sessions.messages({ sessionID }).pipe(Effect.orDie)],
       { concurrency: 0 },
     )
 
@@ -124,16 +121,28 @@ export const CheckpointRevertCommand = effectCmd({
       .positional("partID", {
         describe: "optional part ID for a finer-grained revert",
         type: "string",
+      })
+      .option("mode", {
+        describe: "restore scope: code (files only), convo (conversation only, trims on next prompt), both (default)",
+        type: "string",
+        choices: ["code", "convo", "both"],
+        default: "both",
       }),
   handler: Effect.fn("Cli.checkpoint.revert")(function* (args) {
     const svc = yield* SessionRevert.Service
     const sessionID = SessionID.make(args.sessionID)
     const messageID = MessageID.make(args.messageID)
     const partID = args.partID ? PartID.make(args.partID) : undefined
-    const session = yield* svc.revert({ sessionID, messageID, partID }).pipe(Effect.orDie)
+    const session = yield* svc.revert({ sessionID, messageID, partID, mode: args.mode }).pipe(Effect.orDie)
 
     UI.println(UI.Style.TEXT_SUCCESS_BOLD + `Reverted session ${sessionID} to ${messageID}` + UI.Style.TEXT_NORMAL)
-    if (session.revert?.diff) {
+    if (args.mode === "code") {
+      UI.println("Filesystem changes have been restored to the checkpoint state.")
+      UI.println("The conversation was left untouched.")
+    } else if (args.mode === "convo") {
+      UI.println("Conversation boundary set — later messages will be trimmed on the next prompt.")
+      UI.println("The filesystem was left untouched.")
+    } else if (session.revert?.diff) {
       UI.println("Filesystem changes have been restored to the checkpoint state.")
       UI.println("Run `advcode checkpoint diff <sessionID> <messageID>` to review the change diff.")
     }
@@ -157,7 +166,9 @@ export const CheckpointUnrevertCommand = effectCmd({
   }),
 })
 
-function formatTable(checkpoints: { messageID: string; role: string; id: string; snapshot: string; kind: string; active: boolean }[]) {
+function formatTable(
+  checkpoints: { messageID: string; role: string; id: string; snapshot: string; kind: string; active: boolean }[],
+) {
   const lines = ["Message ID       Role       Part      Kind       Snapshot"]
   lines.push("─".repeat(70))
   for (const c of checkpoints) {

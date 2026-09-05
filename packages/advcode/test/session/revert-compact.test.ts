@@ -680,4 +680,132 @@ describe("revert + compact workflow", () => {
       { git: true },
     ),
   )
+
+  it.live(
+    "revert with mode convo trims conversation without touching files",
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          const session = yield* Session.Service
+          const revert = yield* SessionRevert.Service
+          const snapshot = yield* Snapshot.Service
+
+          yield* write(path.join(dir, "a.txt"), "a0")
+
+          const info = yield* session.create({})
+          const sid = info.id
+
+          const u1 = yield* user(sid)
+          yield* text(sid, u1.id, "first")
+          const a1 = yield* assistant(sid, u1.id, dir)
+          const before = yield* snapshot.track()
+          if (!before) throw new Error("expected snapshot")
+          yield* write(path.join(dir, "a.txt"), "a1")
+          const after = yield* snapshot.track()
+          if (!after) throw new Error("expected snapshot")
+          const patch = yield* snapshot.patch(before)
+          yield* session.updatePart({
+            id: PartID.ascending(),
+            messageID: a1.id,
+            sessionID: sid,
+            type: "patch",
+            hash: patch.hash,
+            files: patch.files,
+          })
+
+          const u2 = yield* user(sid)
+          yield* text(sid, u2.id, "second")
+          const a2 = yield* assistant(sid, u2.id, dir)
+          yield* text(sid, a2.id, "second answer")
+
+          yield* revert.revert({
+            sessionID: sid,
+            messageID: u2.id,
+            mode: "convo",
+          })
+
+          // Files untouched, boundary set without a snapshot.
+          expect(yield* read(path.join(dir, "a.txt"))).toBe("a1")
+          const state = yield* session.get(sid)
+          expect(state.revert?.messageID).toBe(u2.id)
+          expect(state.revert?.mode === "convo").toBe(true)
+          expect(state.revert?.snapshot).toBeUndefined()
+
+          yield* revert.cleanup(state)
+          const msgs = yield* session.messages({ sessionID: sid })
+          const ids = msgs.map((m) => m.info.id)
+          expect(ids).not.toContain(u2.id)
+          expect(ids).not.toContain(a2.id)
+          expect(ids).toContain(u1.id)
+          expect(ids).toContain(a1.id)
+
+          // unrevert clears the boundary without restoring any file state.
+          yield* revert.unrevert({ sessionID: sid })
+          expect((yield* session.get(sid)).revert).toBeUndefined()
+          expect(yield* read(path.join(dir, "a.txt"))).toBe("a1")
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live(
+    "revert with mode code restores files and leaves no boundary",
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          const session = yield* Session.Service
+          const revert = yield* SessionRevert.Service
+          const snapshot = yield* Snapshot.Service
+
+          yield* write(path.join(dir, "a.txt"), "a0")
+
+          const info = yield* session.create({})
+          const sid = info.id
+
+          const u1 = yield* user(sid)
+          yield* text(sid, u1.id, "first")
+          const a1 = yield* assistant(sid, u1.id, dir)
+          const before = yield* snapshot.track()
+          if (!before) throw new Error("expected snapshot")
+          yield* write(path.join(dir, "a.txt"), "a1")
+          const after = yield* snapshot.track()
+          if (!after) throw new Error("expected snapshot")
+          const patch = yield* snapshot.patch(before)
+          yield* session.updatePart({
+            id: PartID.ascending(),
+            messageID: a1.id,
+            sessionID: sid,
+            type: "patch",
+            hash: patch.hash,
+            files: patch.files,
+          })
+
+          const u2 = yield* user(sid)
+          yield* text(sid, u2.id, "second")
+          yield* assistant(sid, u2.id, dir)
+
+          expect(yield* read(path.join(dir, "a.txt"))).toBe("a1")
+
+          const reverted = yield* revert.revert({
+            sessionID: sid,
+            messageID: u1.id,
+            mode: "code",
+          })
+
+          // Files restored to the checkpoint, no boundary, conversation intact.
+          expect(yield* read(path.join(dir, "a.txt"))).toBe("a0")
+          expect(reverted.revert).toBeUndefined()
+          const msgs = yield* session.messages({ sessionID: sid })
+          const ids = msgs.map((m) => m.info.id)
+          expect(ids).toContain(u1.id)
+          expect(ids).toContain(a1.id)
+          expect(ids).toContain(u2.id)
+
+          // cleanup with no boundary is a no-op.
+          yield* revert.cleanup(reverted)
+          expect((yield* session.messages({ sessionID: sid })).length).toBe(4)
+        }),
+      { git: true },
+    ),
+  )
 })

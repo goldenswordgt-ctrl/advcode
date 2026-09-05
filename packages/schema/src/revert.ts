@@ -20,5 +20,6 @@ export const State = Schema.Struct({
   snapshot: Schema.String.pipe(optional),
   diff: Schema.String.pipe(optional),
   files: Schema.Array(FileDiff).pipe(optional),
+  mode: Schema.Literals(["code", "convo", "both"]).pipe(optional),
 }).annotate({ identifier: "Revert.State" })
 export interface State extends Schema.Schema.Type<typeof State> {}
