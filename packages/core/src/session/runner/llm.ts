@@ -8,7 +8,7 @@ import {
   isContextOverflowFailure,
   type ProviderErrorEvent,
 } from "@opencode-ai/llm"
-import { Cause, DateTime, Effect, FiberSet, Layer, Option, Semaphore, Stream } from "effect"
+import { Cause, DateTime, Effect, Exit, FiberSet, Layer, Option, Semaphore, Stream } from "effect"
 import { AgentV2 } from "../../agent"
 import { Config } from "../../config"
 import { Database } from "../../database/database"
@@ -28,6 +28,7 @@ import { ToolRegistry } from "../../tool/registry"
 import { ToolOutputStore } from "../../tool-output-store"
 import { SessionContextEpoch } from "../context-epoch"
 import { SessionCompaction } from "../compaction"
+import { SessionDrain } from "../drain"
 import { SessionEvent } from "../event"
 import { SessionHistory } from "../history"
 import { SessionHooks } from "../hooks"
@@ -52,7 +53,7 @@ import { llmClient } from "../../effect/app-node-platform"
  * - Session ownership and controls
  *   - [x] Coordinate one local active drain per Session; explicit resumes join and prompt wakeups coalesce.
  *   - [ ] Replace local ownership with durable multi-node ownership when clustered.
- *   - [ ] Mark busy, retrying, idle, interrupted, or terminal-failure status durably.
+ *   - [x] Mark busy, retrying, idle, interrupted, or terminal-failure status durably.
  *   - [ ] Honor interruption and reject stale work after runtime attachment replacement.
  *   - [x] Honor optional agent step limits.
  *   - [ ] Bound provider retries and repeated identical tool calls.
@@ -408,25 +409,31 @@ const layer = Layer.effect(
       const hasSteer = yield* SessionInput.hasPending(db, input.sessionID, "steer")
       const hasQueue = hasSteer ? false : yield* SessionInput.hasPending(db, input.sessionID, "queue")
       if (!input.force && !hasSteer && !hasQueue) return
-      yield* failInterruptedTools(input.sessionID)
-      let promotion: SessionInput.Delivery | undefined = hasSteer ? "steer" : hasQueue ? "queue" : undefined
-      let shouldRun = input.force || hasSteer || hasQueue
-      while (shouldRun) {
-        let needsContinuation = true
-        let step = 1
-        while (needsContinuation) {
-          const result = yield* runTurn(input.sessionID, promotion, step)
-          needsContinuation = result.needsContinuation
-          step = result.step + 1
-          promotion = "steer"
-          if (!needsContinuation) needsContinuation = yield* SessionInput.hasPending(db, input.sessionID, "steer")
+      yield* SessionDrain.start(db, input.sessionID)
+      const drain = yield* Effect.gen(function* () {
+        yield* failInterruptedTools(input.sessionID)
+        let promotion: SessionInput.Delivery | undefined = hasSteer ? "steer" : hasQueue ? "queue" : undefined
+        let shouldRun = input.force || hasSteer || hasQueue
+        while (shouldRun) {
+          let needsContinuation = true
+          let step = 1
+          while (needsContinuation) {
+            const result = yield* runTurn(input.sessionID, promotion, step)
+            needsContinuation = result.needsContinuation
+            step = result.step + 1
+            promotion = "steer"
+            yield* SessionDrain.heartbeat(db, input.sessionID, step)
+            if (!needsContinuation) needsContinuation = yield* SessionInput.hasPending(db, input.sessionID, "steer")
+          }
+          yield* selfLearning
+            .learnFromTurn({ sessionID: input.sessionID, worked: true })
+            .pipe(Effect.forkDetach)
+          shouldRun = yield* SessionInput.hasPending(db, input.sessionID, "queue")
+          promotion = shouldRun ? "queue" : undefined
         }
-        yield* selfLearning
-          .learnFromTurn({ sessionID: input.sessionID, worked: true })
-          .pipe(Effect.forkDetach)
-        shouldRun = yield* SessionInput.hasPending(db, input.sessionID, "queue")
-        promotion = shouldRun ? "queue" : undefined
-      }
+      }).pipe(Effect.exit)
+      yield* SessionDrain.finish(db, input.sessionID, Exit.isSuccess(drain) ? "completed" : "interrupted")
+      return yield* drain
     })
 
     return Service.of({

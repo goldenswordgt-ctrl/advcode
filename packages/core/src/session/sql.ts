@@ -4,6 +4,7 @@ import { ProjectTable } from "../project/sql"
 import type { SessionMessage } from "./message"
 import type { Prompt } from "./prompt"
 import type { SessionInput } from "./input"
+import type { SessionDrain } from "./drain"
 import type { Snapshot } from "../snapshot"
 import { PermissionV1 } from "../v1/permission"
 import { ProjectV2 } from "../project"
@@ -164,6 +165,23 @@ export const SessionInputTable = sqliteTable(
     uniqueIndex("session_input_session_promoted_seq_idx").on(table.session_id, table.promoted_seq),
   ],
 )
+
+export const SessionDrainTable = sqliteTable("session_drain", {
+  session_id: text()
+    .$type<SessionSchema.ID>()
+    .primaryKey()
+    .references(() => SessionTable.id, { onDelete: "cascade" }),
+  status: text().$type<SessionDrain.Status>().notNull(),
+  attempt: integer().notNull(),
+  step: integer().notNull().default(0),
+  time_started: integer()
+    .notNull()
+    .$default(() => Date.now()),
+  time_heartbeat: integer()
+    .notNull()
+    .$default(() => Date.now()),
+  time_finished: integer(),
+})
 
 export const SessionContextEpochTable = sqliteTable("session_context_epoch", {
   session_id: text()

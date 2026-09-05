@@ -57,6 +57,28 @@ export default {
         );
       `)
       yield* tx.run(`
+        CREATE TABLE \`bot_agent\` (
+          \`id\` text PRIMARY KEY,
+          \`name\` text NOT NULL,
+          \`persona\` text,
+          \`avatar\` text,
+          \`model\` text,
+          \`system_prompt\` text,
+          \`time_created\` integer NOT NULL,
+          \`time_updated\` integer NOT NULL
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`bot_message\` (
+          \`id\` text PRIMARY KEY,
+          \`bot_id\` text NOT NULL,
+          \`channel\` text NOT NULL,
+          \`body\` text NOT NULL,
+          \`time_created\` integer NOT NULL,
+          \`time_updated\` integer NOT NULL
+        );
+      `)
+      yield* tx.run(`
         CREATE TABLE \`credential\` (
           \`id\` text PRIMARY KEY,
           \`integration_id\` text,
@@ -84,6 +106,31 @@ export default {
           \`type\` text NOT NULL,
           \`data\` text NOT NULL,
           CONSTRAINT \`fk_event_aggregate_id_event_sequence_aggregate_id_fk\` FOREIGN KEY (\`aggregate_id\`) REFERENCES \`event_sequence\`(\`aggregate_id\`) ON DELETE CASCADE
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`memory_entry\` (
+          \`id\` text PRIMARY KEY,
+          \`session_id\` text,
+          \`type\` text NOT NULL,
+          \`key\` text NOT NULL,
+          \`value\` text NOT NULL,
+          \`importance\` integer DEFAULT 1 NOT NULL,
+          \`source\` text DEFAULT 'session' NOT NULL,
+          \`time_created\` integer NOT NULL,
+          \`time_updated\` integer NOT NULL,
+          \`time_last_accessed\` integer
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`memory_user_model\` (
+          \`id\` text PRIMARY KEY,
+          \`key\` text NOT NULL,
+          \`value\` text NOT NULL,
+          \`confidence\` real DEFAULT 0.5 NOT NULL,
+          \`source_session_id\` text,
+          \`time_created\` integer NOT NULL,
+          \`time_updated\` integer NOT NULL
         );
       `)
       yield* tx.run(`
@@ -152,6 +199,18 @@ export default {
           \`snapshot\` text NOT NULL,
           \`baseline_seq\` integer NOT NULL,
           CONSTRAINT \`fk_session_context_epoch_session_id_session_id_fk\` FOREIGN KEY (\`session_id\`) REFERENCES \`session\`(\`id\`) ON DELETE CASCADE
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`session_drain\` (
+          \`session_id\` text PRIMARY KEY,
+          \`status\` text NOT NULL,
+          \`attempt\` integer NOT NULL,
+          \`step\` integer DEFAULT 0 NOT NULL,
+          \`time_started\` integer NOT NULL,
+          \`time_heartbeat\` integer NOT NULL,
+          \`time_finished\` integer,
+          CONSTRAINT \`fk_session_drain_session_id_session_id_fk\` FOREIGN KEY (\`session_id\`) REFERENCES \`session\`(\`id\`) ON DELETE CASCADE
         );
       `)
       yield* tx.run(`
@@ -236,8 +295,28 @@ export default {
           CONSTRAINT \`fk_session_share_session_id_session_id_fk\` FOREIGN KEY (\`session_id\`) REFERENCES \`session\`(\`id\`) ON DELETE CASCADE
         );
       `)
+      yield* tx.run(`
+        CREATE TABLE \`skill_learned\` (
+          \`id\` text PRIMARY KEY,
+          \`name\` text NOT NULL,
+          \`description\` text,
+          \`content\` text NOT NULL,
+          \`source_session_id\` text,
+          \`times_used\` integer DEFAULT 0 NOT NULL,
+          \`times_improved\` integer DEFAULT 0 NOT NULL,
+          \`last_used_at\` integer,
+          \`time_created\` integer NOT NULL,
+          \`time_updated\` integer NOT NULL
+        );
+      `)
+      yield* tx.run(`CREATE INDEX \`bot_agent_name_idx\` ON \`bot_agent\` (\`name\`);`)
+      yield* tx.run(`CREATE INDEX \`bot_message_channel_idx\` ON \`bot_message\` (\`channel\`);`)
+      yield* tx.run(`CREATE INDEX \`bot_message_bot_idx\` ON \`bot_message\` (\`bot_id\`);`)
       yield* tx.run(`CREATE UNIQUE INDEX \`event_aggregate_seq_idx\` ON \`event\` (\`aggregate_id\`,\`seq\`);`)
       yield* tx.run(`CREATE INDEX \`event_aggregate_type_seq_idx\` ON \`event\` (\`aggregate_id\`,\`type\`,\`seq\`);`)
+      yield* tx.run(`CREATE INDEX \`memory_entry_key_idx\` ON \`memory_entry\` (\`key\`);`)
+      yield* tx.run(`CREATE INDEX \`memory_entry_type_idx\` ON \`memory_entry\` (\`type\`);`)
+      yield* tx.run(`CREATE INDEX \`memory_user_model_key_idx\` ON \`memory_user_model\` (\`key\`);`)
       yield* tx.run(
         `CREATE UNIQUE INDEX \`permission_project_action_resource_idx\` ON \`permission\` (\`project_id\`,\`action\`,\`resource\`);`,
       )
@@ -269,6 +348,7 @@ export default {
       yield* tx.run(`CREATE INDEX \`session_workspace_idx\` ON \`session\` (\`workspace_id\`);`)
       yield* tx.run(`CREATE INDEX \`session_parent_idx\` ON \`session\` (\`parent_id\`);`)
       yield* tx.run(`CREATE INDEX \`todo_session_idx\` ON \`todo\` (\`session_id\`);`)
+      yield* tx.run(`CREATE INDEX \`skill_learned_name_idx\` ON \`skill_learned\` (\`name\`);`)
     })
   },
 } satisfies Omit<DatabaseMigration.Migration, "id">

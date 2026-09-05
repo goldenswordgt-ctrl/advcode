@@ -43,6 +43,7 @@ import { AfkCommand } from "./cli/cmd/afk"
 import { TranscriptListCommand, TranscriptGetCommand } from "./cli/cmd/transcript"
 import { WorktreeCommand } from "./cli/cmd/worktree"
 import { CheckpointCommand } from "./cli/cmd/checkpoint"
+import { RecoveryCommand } from "./cli/cmd/recovery"
 import { WatchCommand } from "./cli/cmd/watch"
 import { MemoryBankCommand } from "./cli/cmd/memory-bank"
 import { Heap } from "./cli/heap"
@@ -139,6 +140,7 @@ const cli = yargs(args)
   .command(AfkCommand)
   .command(WorktreeCommand)
   .command(CheckpointCommand)
+  .command(RecoveryCommand)
   .command(WatchCommand)
   .command(MemoryBankCommand)
   .command({
