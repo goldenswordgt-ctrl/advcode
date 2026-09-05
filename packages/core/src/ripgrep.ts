@@ -18,6 +18,7 @@ import { RipgrepBinary } from "./ripgrep/binary"
 const ERROR_BYTES = 8 * 1024
 const MAX_RECORD_BYTES = 64 * 1024
 const MAX_SUBMATCHES = 100
+const SEARCH_TIMEOUT_MS = 60_000
 
 const RawMatch = Schema.Struct({
   type: Schema.Literal("match"),
@@ -55,6 +56,7 @@ export interface FindInput {
   readonly hidden?: boolean
   readonly follow?: boolean
   readonly signal?: AbortSignal
+  readonly timeoutMs?: number
   readonly onEntry?: (entry: Entry) => Effect.Effect<void>
 }
 
@@ -65,6 +67,7 @@ export interface GlobInput {
   readonly hidden?: boolean
   readonly follow?: boolean
   readonly signal?: AbortSignal
+  readonly timeoutMs?: number
 }
 
 export interface GrepInput {
@@ -74,6 +77,7 @@ export interface GrepInput {
   readonly include?: string
   readonly limit: number
   readonly signal?: AbortSignal
+  readonly timeoutMs?: number
 }
 
 export interface Interface {
@@ -100,10 +104,12 @@ const layer = Layer.effect(
       readonly args: string[]
       readonly limit: number
       readonly signal?: AbortSignal
+      readonly timeoutMs?: number
       readonly parse: (line: string) => Effect.Effect<A | undefined, Error>
       readonly pattern?: string
       readonly onItem?: (item: A) => Effect.Effect<void>
     }) => {
+      const timeoutMs = input.timeoutMs ?? SEARCH_TIMEOUT_MS
       const program = Effect.scoped(
         Effect.gen(function* () {
           const handle = yield* process.spawn(
@@ -143,6 +149,14 @@ const layer = Layer.effect(
       )
       const abortable = input.signal ? program.pipe(Effect.raceFirst(waitForAbort(input.signal))) : program
       return abortable.pipe(
+        // Scope release on interruption kills the rg process group, so a
+        // timed-out search leaves no orphan behind.
+        Effect.timeout(timeoutMs),
+        Effect.flatMap((result) =>
+          result === undefined
+            ? Effect.fail(failure(`ripgrep timed out after ${timeoutMs}ms`))
+            : Effect.succeed(result),
+        ),
         Effect.mapError((cause) =>
           cause instanceof Error || cause instanceof InvalidPatternError
             ? cause
