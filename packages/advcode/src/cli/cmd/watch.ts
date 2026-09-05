@@ -5,7 +5,11 @@ import { FSUtil } from "@opencode-ai/core/fs-util"
 import { Ripgrep } from "@opencode-ai/core/ripgrep"
 import { Watcher } from "@opencode-ai/core/filesystem/watcher"
 import { Location } from "@opencode-ai/core/location"
-import { LocationServiceMap, locationServiceMapLayer, locationGlobalServices } from "@opencode-ai/core/location-services"
+import {
+  LocationServiceMap,
+  locationServiceMapLayer,
+  locationGlobalServices,
+} from "@opencode-ai/core/location-services"
 import { AbsolutePath } from "@opencode-ai/core/schema"
 import { FileSystemWatcher } from "@opencode-ai/schema/filesystem-watcher"
 import { effectCmd, fail } from "../effect-cmd"
@@ -15,11 +19,22 @@ import { UI } from "../ui"
 /**
  * Watch mode — Aider-style `AI:` comments drive the agent.
  *
- * Leaves an `AI: <instruction>` comment in any watched file and the agent
- * picks it up as a task within the debounce window. Language-agnostic: the
- * marker is matched after common single-line comment prefixes (`//`, `#`,
- * `--`, `*`, `/*`, `<!--`, `;`). Identical instructions are only dispatched
- * once per process, so re-saving a file does not re-run the same task.
+ * Leaves a marker comment in any watched file and the agent picks it up as a
+ * task within the debounce window. Three marker kinds, mirroring Aider:
+ *
+ * - `AI: <instruction>` — dispatch the instruction as a task (unchanged
+ *   behavior; requires non-empty text).
+ * - `AI!` — edit mode: the agent edits the code near/instructed by the marker.
+ *   Text after `AI!` is optional (`AI!` alone means "fix the code around this
+ *   marker"). Once the task completes, the `!` is stripped from the marker
+ *   (leaving `AI`) so it is not re-dispatched.
+ * - `AI?` — review mode: the agent answers in chat without modifying files.
+ *   Text after `AI?` is optional ("review the code around this marker").
+ *
+ * Language-agnostic: the marker is matched after common single-line comment
+ * prefixes (`//`, `#`, `--`, `*`, `/*`, `<!--`, `;`). Identical instructions
+ * are only dispatched once per process, so re-saving a file does not re-run
+ * the same task.
  */
 
 const withLocation = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
@@ -42,33 +57,70 @@ function escapeRegex(input: string) {
   return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }
 
-function extractInstructions(content: string, marker: string): { line: number; text: string }[] {
-  const tag = `${marker}:`
-  const out: { line: number; text: string }[] = []
+export type WatchMarkerKind = ":" | "!" | "?"
+export interface WatchMarker {
+  readonly line: number
+  readonly text: string
+  readonly kind: WatchMarkerKind
+}
+
+export function extractMarkers(content: string, marker: string): WatchMarker[] {
+  const out: WatchMarker[] = []
   const lines = content.split("\n")
   for (let i = 0; i < lines.length; i++) {
     let rest = lines[i]!.trim()
     const prefix = COMMENT_PREFIX.exec(rest)?.[0]
     if (prefix) rest = rest.slice(prefix.length).trimStart()
     rest = rest.replace(COMMENT_SUFFIX, "").trimEnd()
-    if (!rest.startsWith(tag)) continue
-    const text = rest.slice(tag.length).trim()
-    if (text.length > 0) out.push({ line: i + 1, text })
+    for (const kind of [":", "!", "?"] as const) {
+      const tag = `${marker}${kind}`
+      if (!rest.startsWith(tag)) continue
+      const text = rest.slice(tag.length).trim()
+      // `AI:` requires an instruction; bare `AI!`/`AI?` are valid (fix/review
+      // the code around the marker).
+      if (text.length > 0 || kind !== ":") out.push({ line: i + 1, text, kind })
+      break
+    }
   }
   return out
+}
+
+/** Strip the `!` from an `AI!` marker on the given 1-indexed line (leaves `AI`). */
+export function consumeMarker(content: string, marker: string, line: number): string {
+  const lines = content.split("\n")
+  const index = line - 1
+  const target = lines[index]
+  if (target === undefined) return content
+  const tag = `${marker}!`
+  const at = target.indexOf(tag)
+  if (at === -1) return content
+  lines[index] = target.slice(0, at) + marker + target.slice(at + tag.length)
+  return lines.join("\n")
+}
+
+const KIND_HEADER: Record<WatchMarkerKind, string> = {
+  ":": "instruction",
+  "!": "edit request",
+  "?": "review request",
+}
+
+const KIND_GUIDANCE: Record<WatchMarkerKind, string> = {
+  ":": "",
+  "!": " Edit the code to satisfy it.",
+  "?": " Answer in chat; do not modify files.",
 }
 
 export const WatchCommand = effectCmd({
   command: "watch",
   describe:
-    "watch files for 'AI:' comments and run each as an agent task (requires OPENCODE_EXPERIMENTAL_FILEWATCHER=1)",
+    "watch files for 'AI:', 'AI!' and 'AI?' comments and run each as an agent task (requires OPENCODE_EXPERIMENTAL_FILEWATCHER=1)",
   instance: false,
   builder: (yargs) =>
     yargs
       .option("marker", {
         type: "string",
         default: "AI",
-        describe: "instruction marker prefix (matched as <marker>:)",
+        describe: "instruction marker prefix (matched as <marker>:, <marker>! or <marker>?)",
       })
       .option("model", {
         type: "string",
@@ -106,35 +158,48 @@ export const WatchCommand = effectCmd({
       // debounced stream emits a settle tick, which drains the whole batch.
       const pending = yield* Ref.make(new Set<string>())
 
-      const dispatch = Effect.fn("Cli.watch.dispatch")(function* (file: string, instruction: { line: number; text: string }) {
+      const dispatch = Effect.fn("Cli.watch.dispatch")(function* (file: string, instruction: WatchMarker) {
         const rel = path.relative(location.project.directory, file)
-        const where = `${rel}:${instruction.line}`
+        const where = `${rel}:${instruction.line}${instruction.kind}`
+        const label = `${rel}:${instruction.line}: ${instruction.text}`
         if (args["dry-run"]) {
-          UI.println(`[watch] ${where}: ${instruction.text}`)
+          UI.println(`[watch] ${label}`)
           return
         }
-        UI.println(`[watch] ${where}: ${instruction.text}`)
+        UI.println(`[watch] ${label}`)
+        const fallback =
+          instruction.kind === "!" ? "Fix the code around this marker." : "Review the code around this marker."
+        const body = instruction.text || fallback
         const { runMini } = yield* Effect.promise(() => import("./run"))
         yield* Effect.tryPromise(() =>
           runMini({
             directory: location.project.directory,
             model: args.model,
             agent: args.agent,
-            prompt: [`[watch] instruction from ${where}`, instruction.text].join("\n"),
+            prompt: [
+              `[watch] ${KIND_HEADER[instruction.kind]} from ${where}`,
+              body + KIND_GUIDANCE[instruction.kind],
+            ].join("\n"),
           }),
         ).pipe(Effect.catchCause((cause) => Effect.logError("watch task failed", { file, cause })))
+        // `AI!` tasks edit the file; consume the bang once the task settles so
+        // the marker does not fire again but stays visible as `AI`.
+        if (instruction.kind === "!") {
+          const current = yield* fs.readFileStringSafe(file).pipe(Effect.catch(() => Effect.succeed(undefined)))
+          if (current === undefined) return
+          const next = consumeMarker(current, args.marker, instruction.line)
+          if (next !== current) {
+            yield* fs.writeFileString(file, next).pipe(Effect.catch(() => Effect.void))
+          }
+        }
       })
 
       const processFile = Effect.fn("Cli.watch.processFile")(function* (file: string) {
-        const content = yield* fs
-          .readFileStringSafe(file)
-          .pipe(Effect.catch(() => Effect.succeed(undefined)))
+        const content = yield* fs.readFileStringSafe(file).pipe(Effect.catch(() => Effect.succeed(undefined)))
         if (content === undefined) return
-        for (const instruction of extractInstructions(content, args.marker)) {
-          const key = `${file}:${instruction.line}:${instruction.text}`
-          const isNew = yield* Ref.modify(seen, (set) =>
-            set.has(key) ? [false, set] : [true, new Set(set).add(key)],
-          )
+        for (const instruction of extractMarkers(content, args.marker)) {
+          const key = `${file}:${instruction.line}:${instruction.kind}:${instruction.text}`
+          const isNew = yield* Ref.modify(seen, (set) => (set.has(key) ? [false, set] : [true, new Set(set).add(key)]))
           if (isNew) yield* dispatch(file, instruction)
         }
       })
@@ -149,7 +214,7 @@ export const WatchCommand = effectCmd({
       // an edit. Uses the same scanner as the event path.
       const scanInitial = Effect.fn("Cli.watch.scanInitial")(function* () {
         const rg = yield* Ripgrep.Service
-        const pattern = `^\\s*(?://|#|--|\\*|/\\*|<!--|;)?\\s*${escapeRegex(args.marker)}:`
+        const pattern = `^\\s*(?://|#|--|\\*|/\\*|<!--|;)?\\s*${escapeRegex(args.marker)}[:!?]`
         const matches = yield* rg
           .grep({ cwd: location.project.directory, pattern, limit: 1000 })
           .pipe(Effect.catch(() => Effect.succeed([])))
@@ -160,7 +225,7 @@ export const WatchCommand = effectCmd({
       })
 
       UI.println(
-        `[watch] watching ${location.project.directory} for "${args.marker}:" comments (Ctrl+C to stop)`,
+        `[watch] watching ${location.project.directory} for "${args.marker}:", "${args.marker}!" and "${args.marker}?" comments (Ctrl+C to stop)`,
       )
       yield* scanInitial()
       yield* events.subscribe(FileSystemWatcher.Event.Updated).pipe(
@@ -168,8 +233,5 @@ export const WatchCommand = effectCmd({
         Stream.debounce(Duration.millis(args.debounce)),
         Stream.runForEach(() => drain()),
       )
-    }).pipe(
-      Effect.withSpan("Cli.watch"),
-      withLocation,
-    ),
+    }).pipe(Effect.withSpan("Cli.watch"), withLocation),
 })
