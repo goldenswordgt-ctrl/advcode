@@ -1,0 +1,29 @@
+# Apply the lightweight (low-RAM / low-CPU) profile
+
+Configure this project to run ADVCODE on minimal system resources. Merge, never clobber — preserve every existing key in the project config.
+
+User-provided focus or constraints (honor these):
+$ARGUMENTS
+
+## What to do
+
+1. Locate the project config at `${path}/opencode.json` (or `opencode.jsonc` / `.opencode/opencode.json` if that is what exists). Create it if missing — keep any existing keys untouched.
+2. Trim the heavy or interactive tools by adding a `tools` map that sets these to `false`:
+   - `browser` (embedded browser — high RAM)
+   - `task` (subagent spawning)
+   - `plan` and `code-mode` (agent mode switches)
+   - `question` (interactive prompts)
+   - `websearch` and `mcp-websearch` (network + tool overhead)
+   - `lsp` (language server)
+3. Leave filesystem + shell essentials alone and enabled: `bash`, `read`, `write`, `edit`, `apply_patch`, `glob`, `grep`, `todo`, `webfetch`.
+4. Context: add `"compaction": { "auto": true }` if the key is absent so long sessions auto-trim context.
+5. If the user has a cheap/fast provider model available, add it as `small_model` (title/light tasks). Ask one short question only if you genuinely cannot tell which model is cheap; otherwise leave `small_model` untouched.
+6. Verify by re-reading the config file after writing. Do not touch anything outside the config (no package.json edits, no scripts).
+
+## What to tell the user afterward
+
+- The config profile above applies the moment the project reloads.
+- The full runtime profile (plugins+hooks off, LSP off, external skills off, background subagents off, event projections off, parallel off) comes from the `--lightweight` flag because env flags cannot be set from config files. Relaunch with:
+  `advcode --lightweight`
+  or set `OPENCODE_LIGHTWEIGHT=1` in the shell before launching.
+- Report exactly what you changed and the relaunch command.

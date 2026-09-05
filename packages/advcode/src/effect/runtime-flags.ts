@@ -70,17 +70,50 @@ export type Info = Context.Service.Shape<typeof Service>
 
 // Lightweight mode folds the heavy-subsystem disables into one switch. Read the
 // underlying config service, apply the override set, and return the folded Info.
+//
+// Purpose: a deterministic MINIMAL profile so low-RAM / low-CPU hosts only pay
+// for the core agent. Everything experimental or optional is forced off here —
+// even if an env var tried to enable it — and the profile composes the existing
+// per-subsystem flags rather than gating each wiring point individually.
+//
+// Not folded: in-process background tool settlement (core SessionRunner
+// BACKGROUND_TOOLS) is cheap and runs the tool either way — no extra process,
+// no heavy machinery — so it stays available even in lightweight mode.
 const foldLightweight = (flags: Info): Info => {
   if (!flags.lightweight) return flags
   return {
     ...flags,
+    // Plugins + session hooks (in-process plugin machinery is a real RAM cost)
     pure: true,
+    disableDefaultPlugins: true,
+    // Embedded web UI and external skills
     disableEmbeddedWebUi: true,
     disableExternalSkills: true,
+    // LSP downloads, LSP tool, and LSP type tooling
     disableLspDownload: true,
-    disableClaudeCodeSkills: true,
-    experimentalBackgroundSubagents: false,
     experimentalLspTool: false,
+    experimentalLspTy: false,
+    // Claude Code prompt + skills
+    disableClaudeCodePrompt: true,
+    disableClaudeCodeSkills: true,
+    // Background subagents
+    experimentalBackgroundSubagents: false,
+    // EventV2 projections (catalog/drain/durable markers)
+    experimentalEventSystem: false,
+    // Parallel extension requests, interactive question tool, Exa search
+    enableParallel: false,
+    enableQuestionTool: false,
+    enableExa: false,
+    enableExperimentalModels: false,
+    // All remaining experimental gates off for a fully deterministic profile
+    experimentalReferences: false,
+    experimentalOxfmt: false,
+    experimentalPlanMode: false,
+    experimentalCodeMode: false,
+    experimentalWorkspaces: false,
+    experimentalIconDiscovery: false,
+    experimentalNativeLlm: false,
+    experimentalWebSockets: false,
   }
 }
 

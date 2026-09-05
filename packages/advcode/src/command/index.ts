@@ -8,6 +8,7 @@ import { Config } from "@/config/config"
 import { MCP } from "../mcp"
 import { Skill } from "../skill"
 import PROMPT_INITIALIZE from "./template/initialize.txt"
+import PROMPT_LIGHTWEIGHT from "./template/lightweight.txt"
 import PROMPT_REVIEW from "./template/review.txt"
 import { LegacyEvent } from "@opencode-ai/schema/legacy-event"
 
@@ -46,6 +47,7 @@ export function hints(template: string) {
 export const Default = {
   INIT: "init",
   REVIEW: "review",
+  LIGHTWEIGHT: "lightweight",
 } as const
 
 export interface Interface {
@@ -85,6 +87,15 @@ const layer = Layer.effect(
         },
         subtask: true,
         hints: hints(PROMPT_REVIEW),
+      }
+      commands[Default.LIGHTWEIGHT] = {
+        name: Default.LIGHTWEIGHT,
+        description: "apply the low-RAM minimal profile to this project",
+        source: "command",
+        get template() {
+          return PROMPT_LIGHTWEIGHT.replace("${path}", ctx.worktree)
+        },
+        hints: hints(PROMPT_LIGHTWEIGHT),
       }
 
       for (const [name, command] of Object.entries(cfg.command ?? {})) {

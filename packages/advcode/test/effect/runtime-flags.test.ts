@@ -394,12 +394,29 @@ describe("RuntimeFlags", () => {
 
       expect(flags.lightweight).toBe(true)
       expect(flags.pure).toBe(true)
+      expect(flags.disableDefaultPlugins).toBe(true)
       expect(flags.disableEmbeddedWebUi).toBe(true)
       expect(flags.disableExternalSkills).toBe(true)
       expect(flags.disableLspDownload).toBe(true)
+      expect(flags.disableClaudeCodePrompt).toBe(true)
       expect(flags.disableClaudeCodeSkills).toBe(true)
       expect(flags.experimentalBackgroundSubagents).toBe(false)
       expect(flags.experimentalLspTool).toBe(false)
+      expect(flags.experimentalLspTy).toBe(false)
+      expect(flags.experimentalEventSystem).toBe(false)
+      expect(flags.enableParallel).toBe(false)
+      expect(flags.enableQuestionTool).toBe(false)
+      expect(flags.enableExa).toBe(false)
+      expect(flags.enableExperimentalModels).toBe(false)
+      expect(flags.experimentalReferences).toBe(false)
+      expect(flags.experimentalOxfmt).toBe(false)
+      expect(flags.experimentalPlanMode).toBe(false)
+      expect(flags.experimentalCodeMode).toBe(false)
+      expect(flags.experimentalWorkspaces).toBe(false)
+      expect(flags.experimentalIconDiscovery).toBe(false)
+      expect(flags.experimentalNativeLlm).toBe(false)
+      expect(flags.experimentalWebSockets).toBe(false)
+      expect(flags.client).toBe("cli")
     }),
   )
 
@@ -407,10 +424,14 @@ describe("RuntimeFlags", () => {
     Effect.gen(function* () {
       const flags = yield* readFlags.pipe(Effect.provide(fromConfig({})))
 
+      expect(flags.disableDefaultPlugins).toBe(false)
       expect(flags.disableEmbeddedWebUi).toBe(false)
       expect(flags.disableExternalSkills).toBe(false)
       expect(flags.disableLspDownload).toBe(false)
+      expect(flags.disableClaudeCodePrompt).toBe(false)
       expect(flags.experimentalBackgroundSubagents).toBe(true)
+      expect(flags.experimentalLspTool).toBe(false)
+      expect(flags.experimentalEventSystem).toBe(false)
     }),
   )
 
@@ -420,12 +441,17 @@ describe("RuntimeFlags", () => {
 
       expect(flags.lightweight).toBe(true)
       expect(flags.pure).toBe(true)
+      expect(flags.disableDefaultPlugins).toBe(true)
       expect(flags.disableEmbeddedWebUi).toBe(true)
       expect(flags.disableExternalSkills).toBe(true)
       expect(flags.disableLspDownload).toBe(true)
+      expect(flags.disableClaudeCodePrompt).toBe(true)
       expect(flags.disableClaudeCodeSkills).toBe(true)
       expect(flags.experimentalBackgroundSubagents).toBe(false)
       expect(flags.experimentalLspTool).toBe(false)
+      expect(flags.experimentalEventSystem).toBe(false)
+      expect(flags.enableParallel).toBe(false)
+      expect(flags.enableQuestionTool).toBe(false)
     }),
   )
 
