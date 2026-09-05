@@ -46,6 +46,7 @@ import { CheckpointCommand } from "./cli/cmd/checkpoint"
 import { RecoveryCommand } from "./cli/cmd/recovery"
 import { WatchCommand } from "./cli/cmd/watch"
 import { ContextCommand } from "./cli/cmd/context"
+import { EffortCommand } from "./cli/cmd/effort"
 import { MemoryBankCommand } from "./cli/cmd/memory-bank"
 import { Heap } from "./cli/heap"
 
@@ -145,6 +146,7 @@ const cli = yargs(args)
   .command(RecoveryCommand)
   .command(WatchCommand)
   .command(ContextCommand)
+  .command(EffortCommand)
   .command(MemoryBankCommand)
   .command({
     command: "transcript",
