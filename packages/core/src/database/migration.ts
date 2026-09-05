@@ -18,24 +18,33 @@ export type Migration = {
 export function apply(db: Database) {
   return lock.withPermit(
     Effect.gen(function* () {
-      const tables = yield* db.all<{ name: string }>(
-        sql`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`,
+      // BEGIN IMMEDIATE takes SQLite's cross-process write lock so two
+      // processes booting against one database cannot both decide it is
+      // empty and race schema creation. Database boot sets busy_timeout
+      // before this runs, so a loser waits for the winner's commit instead
+      // of failing with SQLITE_BUSY.
+      const existing = yield* db.transaction(
+        (tx) =>
+          Effect.gen(function* () {
+            const tables = yield* tx.all<{ name: string }>(
+              sql`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`,
+            )
+            if (tables.some((table) => table.name === "session")) return true
+            if (tables.length > 0) return yield* Effect.die("Database is not empty and has no session table")
+            yield* schema.up(tx)
+            yield* tx.run(
+              sql`CREATE TABLE ${sql.identifier("migration")} (id TEXT PRIMARY KEY, time_completed INTEGER NOT NULL)`,
+            )
+            yield* Effect.forEach(migrations, (migration) =>
+              tx.run(
+                sql`INSERT INTO ${sql.identifier("migration")} (id, time_completed) VALUES (${migration.id}, ${Date.now()})`,
+              ),
+            )
+            return false
+          }),
+        { behavior: "immediate" },
       )
-      if (tables.some((table) => table.name === "session")) return yield* applyOnly(db, migrations)
-      if (tables.length > 0) return yield* Effect.die("Database is not empty and has no session table")
-      yield* db.transaction((tx) =>
-        Effect.gen(function* () {
-          yield* schema.up(tx)
-          yield* tx.run(
-            sql`CREATE TABLE ${sql.identifier("migration")} (id TEXT PRIMARY KEY, time_completed INTEGER NOT NULL)`,
-          )
-          yield* Effect.forEach(migrations, (migration) =>
-            tx.run(
-              sql`INSERT INTO ${sql.identifier("migration")} (id, time_completed) VALUES (${migration.id}, ${Date.now()})`,
-            ),
-          )
-        }),
-      )
+      if (existing) yield* applyOnly(db, migrations)
     }),
   )
 }
@@ -95,13 +104,22 @@ export function applyOnly(db: Database, input: Migration[]) {
 
     for (const migration of input) {
       if (completed.has(migration.id)) continue
-      yield* db.transaction((tx) =>
-        Effect.gen(function* () {
-          yield* migration.up(tx)
-          yield* tx.run(
-            sql`INSERT INTO ${sql.identifier("migration")} (id, time_completed) VALUES (${migration.id}, ${Date.now()})`,
-          )
-        }),
+      yield* db.transaction(
+        (tx) =>
+          Effect.gen(function* () {
+            // Claim each migration under BEGIN IMMEDIATE and re-check the
+            // journal inside the lock: a concurrent process may have applied
+            // it between our completed snapshot and this transaction.
+            const applied = yield* tx.get<{ id: string }>(
+              sql`SELECT id FROM ${sql.identifier("migration")} WHERE id = ${migration.id}`,
+            )
+            if (applied) return
+            yield* migration.up(tx)
+            yield* tx.run(
+              sql`INSERT INTO ${sql.identifier("migration")} (id, time_completed) VALUES (${migration.id}, ${Date.now()})`,
+            )
+          }),
+        { behavior: "immediate" },
       )
     }
   })
