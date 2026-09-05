@@ -65,6 +65,29 @@ describe("SystemContext", () => {
     }),
   )
 
+  it.effect("renders per-source baseline texts with attribution", () =>
+    Effect.gen(function* () {
+      const context = SystemContext.combine([
+        stringContext({ key: "core/date", value: "2026-06-03", baseline: (value) => `Today's date is ${value}.` }),
+        stringContext({ key: "core/location", value: "/repo" }),
+      ])
+
+      const rendered = yield* SystemContext.renderSources(context)
+      expect(rendered.map(({ key, text }) => `${key}|${text}`)).toEqual([
+        "core/date|Today's date is 2026-06-03.",
+        "core/location|/repo",
+      ])
+    }),
+  )
+
+  it.effect("renderSources blocks when a source is unavailable", () =>
+    Effect.gen(function* () {
+      const context = stringContext({ key: "core/date", value: SystemContext.unavailable })
+      const exit = yield* Effect.exit(SystemContext.renderSources(context))
+      expect(Exit.isFailure(exit)).toBe(true)
+    }),
+  )
+
   it.effect("renders updates only after a structured value changes", () =>
     Effect.gen(function* () {
       const previous = {

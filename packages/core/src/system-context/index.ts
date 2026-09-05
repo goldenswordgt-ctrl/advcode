@@ -205,6 +205,28 @@ export function initialize(value: SystemContext): Effect.Effect<Generation, Init
   )
 }
 
+/**
+ * Renders every available source's baseline text individually, preserving
+ * per-source attribution (whereas the generated `baseline` string joins the
+ * sources together). Useful for observability: size accounting, bloat
+ * detection, and visualizations.
+ */
+export function renderSources(
+  value: SystemContext,
+): Effect.Effect<ReadonlyArray<{ readonly key: Key; readonly text: string }>, InitializationBlocked> {
+  return observe(value).pipe(
+    Effect.flatMap((entries) => {
+      const unavailable = entries.flatMap((entry) => (entry._tag === "Unavailable" ? [entry.key] : []))
+      if (unavailable.length > 0) return new InitializationBlocked({ keys: unavailable })
+      return Effect.succeed(
+        entries
+          .filter((entry): entry is AvailableEntry => entry._tag === "Available")
+          .map((entry) => ({ key: entry.key, text: entry.baseline().text })),
+      )
+    }),
+  )
+}
+
 function initializeObservation(entries: ReadonlyArray<Entry>): Generation {
   const available = entries.filter((entry): entry is AvailableEntry => entry._tag === "Available")
   const rendered = available.map((entry) => [entry.key, entry.baseline()] as const)

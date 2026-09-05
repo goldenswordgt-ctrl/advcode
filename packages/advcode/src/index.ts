@@ -45,6 +45,7 @@ import { WorktreeCommand } from "./cli/cmd/worktree"
 import { CheckpointCommand } from "./cli/cmd/checkpoint"
 import { RecoveryCommand } from "./cli/cmd/recovery"
 import { WatchCommand } from "./cli/cmd/watch"
+import { ContextCommand } from "./cli/cmd/context"
 import { MemoryBankCommand } from "./cli/cmd/memory-bank"
 import { Heap } from "./cli/heap"
 
@@ -143,6 +144,7 @@ const cli = yargs(args)
   .command(CheckpointCommand)
   .command(RecoveryCommand)
   .command(WatchCommand)
+  .command(ContextCommand)
   .command(MemoryBankCommand)
   .command({
     command: "transcript",
