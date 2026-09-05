@@ -16,6 +16,7 @@ export const CheckpointCommand = cmd({
       .command(CheckpointListCommand)
       .command(CheckpointDiffCommand)
       .command(CheckpointRevertCommand)
+      .command(CheckpointRewindCommand)
       .command(CheckpointUnrevertCommand)
       .demandCommand(),
   async handler() {},
@@ -144,6 +145,111 @@ export const CheckpointRevertCommand = effectCmd({
       UI.println("The filesystem was left untouched.")
     } else if (session.revert?.diff) {
       UI.println("Filesystem changes have been restored to the checkpoint state.")
+      UI.println("Run `advcode checkpoint diff <sessionID> <messageID>` to review the change diff.")
+    }
+  }),
+})
+
+export interface CheckpointTarget {
+  readonly messageID: string
+  readonly partID: string
+}
+
+/**
+ * Find the most recent step-start snapshot (the restore point taken just
+ * before an agent turn), walking the message list newest-first.
+ */
+export function findLatestCheckpoint(
+  messages: readonly {
+    info: { id: string }
+    parts: readonly { id: string; type: string; snapshot?: string }[]
+  }[],
+): CheckpointTarget | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]!
+    for (let j = msg.parts.length - 1; j >= 0; j--) {
+      const part = msg.parts[j]!
+      if (part.type === "step-start" && part.snapshot) {
+        return { messageID: msg.info.id, partID: part.id }
+      }
+    }
+  }
+  return undefined
+}
+
+export const CheckpointRewindCommand = effectCmd({
+  command: "rewind [sessionID]",
+  describe: "revert the filesystem to the most recent checkpoint — instant undo of the last agent work",
+  builder: (yargs) =>
+    yargs
+      .positional("sessionID", {
+        describe: "session ID to rewind (defaults to the most recently updated session)",
+        type: "string",
+      })
+      .option("mode", {
+        describe: "restore scope: code (files only, default), convo, both",
+        type: "string",
+        choices: ["code", "convo", "both"],
+        default: "code",
+      }),
+  handler: Effect.fn("Cli.checkpoint.rewind")(function* (args) {
+    const sessions = yield* Session.Service
+    const svc = yield* SessionRevert.Service
+
+    let sessionID: SessionID
+    if (args.sessionID) {
+      sessionID = SessionID.make(args.sessionID)
+    } else {
+      const latest = (yield* sessions.list({ roots: true, limit: 1 }))[0]
+      if (!latest) {
+        return yield* fail("no sessions found — pass a session ID to `advcode checkpoint rewind <sessionID>`")
+      }
+      sessionID = latest.id
+    }
+
+    const [session, messages] = yield* Effect.all(
+      [sessions.get(sessionID).pipe(Effect.orDie), sessions.messages({ sessionID }).pipe(Effect.orDie)],
+      { concurrency: 0 },
+    )
+
+    // Walk messages newest-first for the most recent step-start snapshot —
+    // that is the restore point taken right before the last agent turn.
+    const latestCheckpoint = findLatestCheckpoint(messages)
+
+    if (!latestCheckpoint) {
+      UI.println("No checkpoints found for this session — nothing to rewind.")
+      return
+    }
+
+    if (
+      session.revert?.messageID === latestCheckpoint.messageID &&
+      session.revert?.partID === latestCheckpoint.partID
+    ) {
+      UI.println("Already rewound to the most recent checkpoint.")
+      return
+    }
+
+    yield* svc
+      .revert({
+        sessionID,
+        messageID: MessageID.make(latestCheckpoint.messageID),
+        partID: PartID.make(latestCheckpoint.partID),
+        mode: args.mode,
+      })
+      .pipe(
+        Effect.catchTag("SessionBusyError", () =>
+          fail(`session ${sessionID} is busy — wait for it to idle and rewind again`),
+        ),
+      )
+
+    UI.println(
+      UI.Style.TEXT_SUCCESS_BOLD + `Rewound session ${sessionID} to its most recent checkpoint` + UI.Style.TEXT_NORMAL,
+    )
+    if (args.mode === "code") {
+      UI.println("Filesystem restored to the state before the last agent turn.")
+    } else if (args.mode === "convo") {
+      UI.println("Conversation boundary set — later messages will be trimmed on the next prompt.")
+    } else if (session.revert?.diff) {
       UI.println("Run `advcode checkpoint diff <sessionID> <messageID>` to review the change diff.")
     }
   }),
