@@ -1844,6 +1844,37 @@ unix(
   30_000,
 )
 
+unix(
+  "compact command stores focus and writes a focus-steered summary",
+  () =>
+    Effect.gen(function* () {
+      const { llm } = yield* useServerConfig((url) => providerCfg(url))
+      const { prompt, sessions, chat } = yield* boot()
+      yield* user(chat.id, "work on auth and the DB schema")
+      yield* llm.text("compacted summary")
+
+      const result = yield* prompt.command({
+        sessionID: chat.id,
+        command: "compact",
+        arguments: "keep the auth flow and the DB schema exact",
+      })
+
+      expect(result.info.role).toBe("assistant")
+      expect(result.info.summary).toBe(true)
+
+      const inputs = yield* llm.inputs
+      const last = inputs.at(-1)
+      expect(JSON.stringify(last?.messages)).toContain("<focus>")
+      expect(JSON.stringify(last?.messages)).toContain("keep the auth flow and the DB schema exact")
+
+      const msgs = yield* sessions.messages({ sessionID: chat.id })
+      const compactionUser = msgs.filter((m) => m.info.role === "user").at(-1)
+      const part = compactionUser?.parts.find((p): p is SessionV1.CompactionPart => p.type === "compaction")
+      expect(part?.focus).toBe("keep the auth flow and the DB schema exact")
+    }),
+  30_000,
+)
+
 unixNoLLMServer(
   "cancel interrupts shell and resolves cleanly",
   () =>

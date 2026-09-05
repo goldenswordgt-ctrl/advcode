@@ -181,6 +181,7 @@ export interface Interface {
     model: { providerID: ProviderV2.ID; modelID: ModelV2.ID }
     auto: boolean
     overflow?: boolean
+    focus?: string
   }) => Effect.Effect<void>
 }
 
@@ -384,6 +385,7 @@ const layer = Layer.effect(
           buildPrompt({
             previousSummary,
             context: [conversation],
+            focus: compactionPart?.focus,
           }),
           ...compacting.context,
         ]
@@ -562,6 +564,7 @@ const layer = Layer.effect(
       model: { providerID: ProviderV2.ID; modelID: ModelV2.ID }
       auto: boolean
       overflow?: boolean
+      focus?: string
     }) {
       const msg = yield* session.updateMessage({
         id: MessageID.ascending(),
@@ -578,6 +581,7 @@ const layer = Layer.effect(
         type: "compaction",
         auto: input.auto,
         overflow: input.overflow,
+        focus: input.focus?.trim() || undefined,
       })
     })
 

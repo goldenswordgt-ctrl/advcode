@@ -54,6 +54,12 @@ When combining:
 - If a blocker has been resolved, update the summary to reflect that while keeping any details still needed to continue the work.
 - Update "Objective" and "Next Move" to reflect the current work state.`
 
+const FOCUS_INSTRUCTIONS = `The user supplied focus instructions for this compaction. Preserve the details, decisions, and context they call out — exact paths, symbols, commands, error strings, and constraints related to the focus areas. You may compress unrelated material more aggressively. Shape "Objective", "Work State", "Next Move", and "Relevant Files" around the focus.
+
+<focus>
+$FOCUS
+</focus>`
+
 type Entry = {
   readonly seq: number
   readonly message: SessionMessage.Message
@@ -157,20 +163,32 @@ const select = (
   }
 }
 
-export const buildPrompt = (input: { readonly previousSummary?: string; readonly context: readonly string[] }) => {
+export const buildPrompt = (input: {
+  readonly previousSummary?: string
+  readonly context: readonly string[]
+  readonly focus?: string
+}) => {
   const conversation = `Here is the conversation so far:\n\n<conversation>\n${input.context.join("\n\n")}\n</conversation>`
+  const focus = input.focus?.trim()
+  const focusInstructions = focus ? FOCUS_INSTRUCTIONS.replace("$FOCUS", focus) : undefined
   if (!input.previousSummary)
     return [
       conversation,
       "Create a new anchored summary from the conversation history in the <conversation> tags above so another coding agent can continue the work.",
+      focusInstructions,
       SUMMARY_TEMPLATE,
-    ].join("\n\n")
+    ]
+      .filter((part): part is string => Boolean(part))
+      .join("\n\n")
   return [
     conversation,
     `Here is the summary of the conversation before the <conversation> above:\n\n<prior-summary>\n${input.previousSummary}\n</prior-summary>`,
     SUMMARY_UPDATE_INSTRUCTIONS,
+    focusInstructions,
     SUMMARY_TEMPLATE,
-  ].join("\n\n")
+  ]
+    .filter((part): part is string => Boolean(part))
+    .join("\n\n")
 }
 
 export const make = (dependencies: Dependencies) => {

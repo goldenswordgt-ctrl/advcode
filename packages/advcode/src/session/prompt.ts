@@ -1408,6 +1408,32 @@ const layer = Layer.effect(
         } as any
       }
 
+      // Direct execution for manual compaction — a real CLI action, not a
+      // prompt injection. Creates a manual compaction message (auto: false)
+      // with the arguments as focus instructions, then runs the session loop
+      // so the summary is generated without an autocontinue follow-up. The
+      // loop result (the summary message) is the command's return value.
+      if (input.command === "compact") {
+        const taskModel = input.model ? Provider.parseModel(input.model) : yield* currentModel(input.sessionID)
+        yield* getModel(taskModel.providerID, taskModel.modelID, input.sessionID)
+        const agent = input.agent ?? (yield* agents.defaultInfo()).name
+        yield* compaction.create({
+          sessionID: input.sessionID,
+          agent,
+          model: { providerID: taskModel.providerID, modelID: taskModel.modelID },
+          auto: false,
+          focus: input.arguments,
+        })
+        const result = yield* loop({ sessionID: input.sessionID })
+        yield* events.publish(Command.Event.Executed, {
+          name: input.command,
+          sessionID: input.sessionID,
+          arguments: input.arguments,
+          messageID: result.info.id,
+        })
+        return result
+      }
+
       const cmd = yield* commands.get(input.command)
       if (!cmd) {
         const available = (yield* commands.list()).map((c) => c.name)

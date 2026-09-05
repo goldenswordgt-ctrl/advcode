@@ -621,6 +621,52 @@ describe("session.compaction.create", () => {
       }),
     ),
   )
+
+  it.live(
+    "stores focus instructions on the compaction part",
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const compact = yield* SessionCompaction.Service
+        const ssn = yield* SessionNs.Service
+        const info = yield* ssn.create({})
+
+        yield* compact.create({
+          sessionID: info.id,
+          agent: "build",
+          model: ref,
+          auto: false,
+          focus: "keep the auth flow details exact",
+        })
+
+        const msgs = yield* ssn.messages({ sessionID: info.id })
+        const part = msgs
+          .flatMap((msg) => msg.parts)
+          .find((item): item is SessionV1.CompactionPart => item.type === "compaction")
+        expect(part).toBeDefined()
+        expect(part?.focus).toBe("keep the auth flow details exact")
+      }),
+    ),
+  )
+
+  it.live(
+    "omits focus on the compaction part when focus is blank",
+    provideTmpdirInstance(() =>
+      Effect.gen(function* () {
+        const compact = yield* SessionCompaction.Service
+        const ssn = yield* SessionNs.Service
+        const info = yield* ssn.create({})
+
+        yield* compact.create({ sessionID: info.id, agent: "build", model: ref, auto: false, focus: "   " })
+
+        const msgs = yield* ssn.messages({ sessionID: info.id })
+        const part = msgs
+          .flatMap((msg) => msg.parts)
+          .find((item): item is SessionV1.CompactionPart => item.type === "compaction")
+        expect(part).toBeDefined()
+        expect(part?.focus).toBeUndefined()
+      }),
+    ),
+  )
 })
 
 describe("session.compaction.prune", () => {
@@ -1418,6 +1464,69 @@ describe("session.compaction.process", () => {
           config: cfg({ tail_turns: 2, preserve_recent_tokens: 10_000 }),
         }),
       )
+    },
+    { git: true },
+  )
+
+  itCompaction.instance(
+    "threads manual compaction focus instructions into the summary prompt",
+    () => {
+      const stub = llm()
+      let captured = ""
+      stub.push(
+        reply("summary", (input) => {
+          captured = JSON.stringify(input.messages)
+        }),
+      )
+      return Effect.gen(function* () {
+        const ssn = yield* SessionNs.Service
+        const session = yield* ssn.create({})
+        yield* createUserMessage(session.id, "older context")
+        yield* SessionCompaction.use.create({
+          sessionID: session.id,
+          agent: "build",
+          model: ref,
+          auto: false,
+          focus: "keep the auth flow and the DB schema exact",
+        })
+
+        const msgs = yield* ssn.messages({ sessionID: session.id })
+        const parent = msgs.at(-1)?.info.id
+        expect(parent).toBeTruthy()
+        yield* SessionCompaction.use.process({ parentID: parent!, messages: msgs, sessionID: session.id, auto: false })
+
+        expect(captured).toContain("<focus>")
+        expect(captured).toContain("keep the auth flow and the DB schema exact")
+        expect(captured).toContain("focus instructions for this compaction")
+      }).pipe(withCompaction({ llm: stub.llmLayer }))
+    },
+    { git: true },
+  )
+
+  itCompaction.instance(
+    "omits focus section when manual compaction has no focus",
+    () => {
+      const stub = llm()
+      let captured = ""
+      stub.push(
+        reply("summary", (input) => {
+          captured = JSON.stringify(input.messages)
+        }),
+      )
+      return Effect.gen(function* () {
+        const ssn = yield* SessionNs.Service
+        const session = yield* ssn.create({})
+        yield* createUserMessage(session.id, "older context")
+        yield* SessionCompaction.use.create({ sessionID: session.id, agent: "build", model: ref, auto: false })
+
+        const msgs = yield* ssn.messages({ sessionID: session.id })
+        const parent = msgs.at(-1)?.info.id
+        expect(parent).toBeTruthy()
+        yield* SessionCompaction.use.process({ parentID: parent!, messages: msgs, sessionID: session.id, auto: false })
+
+        expect(captured).not.toContain("<focus>")
+        expect(captured).not.toContain("focus instructions for this compaction")
+      }).pipe(withCompaction({ llm: stub.llmLayer }))
     },
     { git: true },
   )

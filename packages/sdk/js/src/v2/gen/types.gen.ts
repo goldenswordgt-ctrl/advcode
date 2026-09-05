@@ -9,6 +9,10 @@ export type Event =
   | EventIntegrationUpdated
   | EventIntegrationConnectionUpdated
   | EventCatalogUpdated
+  | EventCatalogProviderAdded
+  | EventCatalogProviderRemoved
+  | EventCatalogModelAdded
+  | EventCatalogModelRemoved
   | EventSessionCreated
   | EventSessionUpdated
   | EventSessionDeleted
@@ -625,6 +629,7 @@ export type CompactionPart = {
   auto: boolean
   overflow?: boolean
   tail_start_id?: string
+  focus?: string
 }
 
 export type Part =
@@ -761,6 +766,36 @@ export type GlobalEvent = {
         type: "catalog.updated"
         properties: {
           [key: string]: unknown
+        }
+      }
+    | {
+        id: string
+        type: "catalog.provider.added"
+        properties: {
+          providerID: string
+        }
+      }
+    | {
+        id: string
+        type: "catalog.provider.removed"
+        properties: {
+          providerID: string
+        }
+      }
+    | {
+        id: string
+        type: "catalog.model.added"
+        properties: {
+          providerID: string
+          modelID: string
+        }
+      }
+    | {
+        id: string
+        type: "catalog.model.removed"
+        properties: {
+          providerID: string
+          modelID: string
         }
       }
     | {
@@ -1956,6 +1991,7 @@ export type Config = {
     ignore?: Array<string>
   }
   snapshot?: boolean
+  sandbox?: "read-only" | "workspace-write" | "full"
   plugin?: Array<
     | string
     | [
@@ -2917,6 +2953,10 @@ export type V2Event =
   | IntegrationUpdated
   | IntegrationConnectionUpdated
   | CatalogUpdated
+  | CatalogProviderAdded
+  | CatalogProviderRemoved
+  | CatalogModelAdded
+  | CatalogModelRemoved
   | SessionCreated
   | SessionUpdated
   | SessionDeleted
@@ -5193,6 +5233,76 @@ export type CatalogUpdated = {
   }
 }
 
+export type CatalogProviderAdded = {
+  id: string
+  metadata?: {
+    [key: string]: unknown
+  }
+  type: "catalog.provider.added"
+  durable?: {
+    aggregateID: string
+    seq: number
+    version: number
+  }
+  location?: LocationRef
+  data: {
+    providerID: string
+  }
+}
+
+export type CatalogProviderRemoved = {
+  id: string
+  metadata?: {
+    [key: string]: unknown
+  }
+  type: "catalog.provider.removed"
+  durable?: {
+    aggregateID: string
+    seq: number
+    version: number
+  }
+  location?: LocationRef
+  data: {
+    providerID: string
+  }
+}
+
+export type CatalogModelAdded = {
+  id: string
+  metadata?: {
+    [key: string]: unknown
+  }
+  type: "catalog.model.added"
+  durable?: {
+    aggregateID: string
+    seq: number
+    version: number
+  }
+  location?: LocationRef
+  data: {
+    providerID: string
+    modelID: string
+  }
+}
+
+export type CatalogModelRemoved = {
+  id: string
+  metadata?: {
+    [key: string]: unknown
+  }
+  type: "catalog.model.removed"
+  durable?: {
+    aggregateID: string
+    seq: number
+    version: number
+  }
+  location?: LocationRef
+  data: {
+    providerID: string
+    modelID: string
+  }
+}
+
 export type SessionCreated = {
   id: string
   metadata?: {
@@ -6353,6 +6463,40 @@ export type EventCatalogUpdated = {
   type: "catalog.updated"
   properties: {
     [key: string]: unknown
+  }
+}
+
+export type EventCatalogProviderAdded = {
+  id: string
+  type: "catalog.provider.added"
+  properties: {
+    providerID: string
+  }
+}
+
+export type EventCatalogProviderRemoved = {
+  id: string
+  type: "catalog.provider.removed"
+  properties: {
+    providerID: string
+  }
+}
+
+export type EventCatalogModelAdded = {
+  id: string
+  type: "catalog.model.added"
+  properties: {
+    providerID: string
+    modelID: string
+  }
+}
+
+export type EventCatalogModelRemoved = {
+  id: string
+  type: "catalog.model.removed"
+  properties: {
+    providerID: string
+    modelID: string
   }
 }
 

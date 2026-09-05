@@ -47,6 +47,7 @@ export const Default = {
   INIT: "init",
   REVIEW: "review",
   LIGHTWEIGHT: "lightweight",
+  COMPACT: "compact",
 } as const
 
 export interface Interface {
@@ -99,6 +100,20 @@ const layer = Layer.effect(
           return "Lightweight mode is applied directly by the CLI — no model turn is used."
         },
         hints: [],
+      }
+      commands[Default.COMPACT] = {
+        name: Default.COMPACT,
+        description: "compact the session summary [focus...] — pass focus to steer what the summary preserves",
+        source: "command",
+        // Compact is a NATIVE CLI action (SessionPrompt.command direct
+        // execution) — it creates a manual compaction message and runs it,
+        // using the arguments as focus instructions for the summary. This
+        // template stub exists only so the command stays listed; it must
+        // never be expanded into a prompt.
+        get template() {
+          return "Manual compaction is applied directly by the CLI — no model turn is used."
+        },
+        hints: ["$ARGUMENTS"],
       }
 
       for (const [name, command] of Object.entries(cfg.command ?? {})) {

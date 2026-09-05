@@ -30,6 +30,40 @@ test("compaction prompt gives update instructions for a prior summary", () => {
   expect(prompt).toContain('Update "Objective" and "Next Move" to reflect the current work state.')
 })
 
+test("compaction prompt injects focus instructions when focus is supplied", () => {
+  const prompt = SessionCompaction.buildPrompt({
+    context: ["conversation history"],
+    focus: "keep the auth flow and the DB schema exact",
+  })
+
+  expect(prompt.indexOf("<focus>")).toBeLessThan(prompt.indexOf("keep the auth flow and the DB schema exact"))
+  expect(prompt.indexOf("keep the auth flow and the DB schema exact")).toBeLessThan(prompt.indexOf("</focus>"))
+  expect(prompt).toContain("focus instructions for this compaction")
+  expect(prompt).toContain('Shape "Objective", "Work State", "Next Move", and "Relevant Files" around the focus.')
+})
+
+test("compaction prompt omits focus section when focus is empty or undefined", () => {
+  const undefinedFocus = SessionCompaction.buildPrompt({ context: ["here"], previousSummary: "prior" })
+  const blankFocus = SessionCompaction.buildPrompt({ context: ["here"], focus: "   \n  " })
+
+  expect(undefinedFocus).not.toContain("<focus>")
+  expect(undefinedFocus).not.toContain("focus instructions")
+  expect(blankFocus).not.toContain("<focus>")
+  expect(blankFocus).not.toContain("focus instructions")
+})
+
+test("compaction prompt anchors focus for repeated summaries too", () => {
+  const prompt = SessionCompaction.buildPrompt({
+    context: ["new conversation"],
+    previousSummary: "existing summary",
+    focus: "preserve the Vitale icon geometry decisions",
+  })
+
+  expect(prompt).toContain("<prior-summary>")
+  expect(prompt).toContain("preserve the Vitale icon geometry decisions")
+  expect(prompt.indexOf("<focus>")).toBeGreaterThan(prompt.indexOf("The <prior-summary> summarizes"))
+})
+
 test("compaction describes tool media without embedding base64", () => {
   const base64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB"
   const serialized = SessionCompaction.serializeToolContent([
