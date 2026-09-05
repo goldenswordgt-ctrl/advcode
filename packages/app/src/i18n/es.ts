@@ -777,6 +777,9 @@ export const dict = {
   "session.files.binaryContent": "Archivo binario (no se puede mostrar el contenido)",
 
   "session.messages.renderEarlier": "Mostrar mensajes anteriores",
+  "session.status.working": "Working",
+  "session.status.questions": "Questions",
+  "session.status.done": "Done",
   "session.messages.loadingEarlier": "Cargando mensajes anteriores...",
   "session.messages.loadEarlier": "Cargar mensajes anteriores",
   "session.messages.loading": "Cargando mensajes...",

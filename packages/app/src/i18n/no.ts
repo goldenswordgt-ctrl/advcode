@@ -652,6 +652,9 @@ export const dict = {
   "session.files.binaryContent": "Binær fil (innhold kan ikke vises)",
 
   "session.messages.renderEarlier": "Vis tidligere meldinger",
+  "session.status.working": "Working",
+  "session.status.questions": "Questions",
+  "session.status.done": "Done",
   "session.messages.loadingEarlier": "Laster inn tidligere meldinger...",
   "session.messages.loadEarlier": "Last inn tidligere meldinger",
   "session.messages.loading": "Laster meldinger...",

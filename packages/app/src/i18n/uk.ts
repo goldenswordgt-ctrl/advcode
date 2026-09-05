@@ -800,6 +800,9 @@ export const dict = {
   "session.files.binaryContent": "Двійковий файл (вміст неможливо відобразити)",
 
   "session.messages.renderEarlier": "Відобразити раніші повідомлення",
+  "session.status.working": "Working",
+  "session.status.questions": "Questions",
+  "session.status.done": "Done",
   "session.messages.loadingEarlier": "Завантаження раніших повідомлень...",
   "session.messages.loadEarlier": "Завантажити раніші повідомлення",
   "session.messages.loading": "Завантаження повідомлень...",

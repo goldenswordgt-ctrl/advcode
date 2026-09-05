@@ -15,7 +15,7 @@ import { useNotification } from "@/context/notification"
 import { usePermission } from "@/context/permission"
 import { messageAgentColor } from "@/utils/agent"
 import { sessionTitle } from "@/utils/session-title"
-import { sessionPermissionRequest } from "../session/composer/session-request-tree"
+import { sessionPermissionRequest, sessionQuestionRequest } from "../session/composer/session-request-tree"
 import { childSessionOnPath, getProjectAvatarSource, hasProjectPermissions } from "./helpers"
 
 export const ProjectIcon = (props: {
@@ -97,8 +97,11 @@ const SessionRow = (props: {
   tint: Accessor<string | undefined>
   isWorking: Accessor<boolean>
   hasPermissions: Accessor<boolean>
+  hasQuestions: Accessor<boolean>
   hasError: Accessor<boolean>
   unseenCount: Accessor<number>
+  status: Accessor<"working" | "questions" | "done">
+  statusLabel: Accessor<string>
   clearHoverProjectSoon: () => void
   sidebarOpened: Accessor<boolean>
   warmPress: () => void
@@ -117,7 +120,7 @@ const SessionRow = (props: {
         props.clearHoverProjectSoon()
       }}
     >
-      <Show when={props.isWorking() || props.hasPermissions() || props.hasError() || props.unseenCount() > 0}>
+      <Show when={props.isWorking() || props.hasPermissions() || props.hasQuestions() || props.hasError() || props.unseenCount() > 0}>
         <div
           class="shrink-0 size-6 flex items-center justify-center"
           style={{ color: props.tint() ?? "var(--icon-interactive-base)" }}
@@ -126,7 +129,7 @@ const SessionRow = (props: {
             <Match when={props.isWorking()}>
               <Spinner class="size-[15px]" />
             </Match>
-            <Match when={props.hasPermissions()}>
+            <Match when={props.hasPermissions() || props.hasQuestions()}>
               <div class="size-1.5 rounded-full bg-surface-warning-strong" />
             </Match>
             <Match when={props.hasError()}>
@@ -139,6 +142,18 @@ const SessionRow = (props: {
         </div>
       </Show>
       <span class="text-14-regular text-text-strong min-w-0 flex-1 truncate">{title()}</span>
+      <Show when={props.sidebarOpened() || props.mobile}>
+        <span
+          class="shrink-0 text-12-regular"
+          classList={{
+            "text-text-weak": props.status() === "done",
+            "text-icon-warning-base": props.status() === "questions",
+            "text-text-interactive-base": props.status() === "working",
+          }}
+        >
+          {props.statusLabel()}
+        </span>
+      </Show>
     </A>
   )
 }
@@ -163,9 +178,23 @@ export const SessionItem = (props: SessionItemProps): JSX.Element => {
       },
     )
   })
+  const hasQuestions = createMemo(() => {
+    return !!sessionQuestionRequest(sessionStore.session, serverSync().session.data.question, props.session.id)
+  })
+  const needsAttention = createMemo(() => hasPermissions() || hasQuestions())
   const isWorking = createMemo(() => {
-    if (hasPermissions()) return false
+    if (needsAttention()) return false
     return serverSync().session.data.session_working(props.session.id)
+  })
+  const status = createMemo(() => {
+    if (needsAttention()) return "questions"
+    if (serverSync().session.data.session_working(props.session.id)) return "working"
+    return "done"
+  })
+  const statusLabel = createMemo(() => {
+    if (status() === "working") return language.t("session.status.working")
+    if (status() === "questions") return language.t("session.status.questions")
+    return language.t("session.status.done")
   })
 
   const tint = createMemo(() =>
@@ -206,8 +235,11 @@ export const SessionItem = (props: SessionItemProps): JSX.Element => {
       tint={tint}
       isWorking={isWorking}
       hasPermissions={hasPermissions}
+      hasQuestions={hasQuestions}
       hasError={hasError}
       unseenCount={unseenCount}
+      status={status}
+      statusLabel={statusLabel}
       clearHoverProjectSoon={props.clearHoverProjectSoon}
       sidebarOpened={layout.sidebar.opened}
       warmPress={() => warm(2, "high")}

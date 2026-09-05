@@ -765,6 +765,9 @@ export const dict = {
   "session.files.binaryContent": "ไฟล์ไบนารี (ไม่สามารถแสดงเนื้อหาได้)",
 
   "session.messages.renderEarlier": "แสดงข้อความก่อนหน้า",
+  "session.status.working": "Working",
+  "session.status.questions": "Questions",
+  "session.status.done": "Done",
   "session.messages.loadingEarlier": "กำลังโหลดข้อความก่อนหน้า...",
   "session.messages.loadEarlier": "โหลดข้อความก่อนหน้า",
   "session.messages.loading": "กำลังโหลดข้อความ...",

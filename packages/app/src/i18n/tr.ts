@@ -778,6 +778,9 @@ export const dict = {
   "session.files.binaryContent": "İkili dosya (içerik görüntülenemiyor)",
 
   "session.messages.renderEarlier": "Önceki mesajları göster",
+  "session.status.working": "Working",
+  "session.status.questions": "Questions",
+  "session.status.done": "Done",
   "session.messages.loadingEarlier": "Önceki mesajlar yükleniyor...",
   "session.messages.loadEarlier": "Önceki mesajları yükle",
   "session.messages.loading": "Mesajlar yükleniyor...",

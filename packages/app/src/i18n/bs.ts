@@ -774,6 +774,9 @@ export const dict = {
   "session.files.binaryContent": "Binarna datoteka (sadržaj se ne može prikazati)",
 
   "session.messages.renderEarlier": "Prikaži ranije poruke",
+  "session.status.working": "Working",
+  "session.status.questions": "Questions",
+  "session.status.done": "Done",
   "session.messages.loadingEarlier": "Učitavanje ranijih poruka...",
   "session.messages.loadEarlier": "Učitaj ranije poruke",
   "session.messages.loading": "Učitavanje poruka...",

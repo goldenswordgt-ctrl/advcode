@@ -414,9 +414,23 @@ function HomeSessionGroupHeader(props: {
   )
 }
 
+type HomeSessionRowStatus = "working" | "questions" | "done"
+
 function HomeSessionRow(props: HomeSessionsViewProps & { record: HomeSessionRecord }) {
   const title = createMemo(() => sessionTitle(props.record.session.title) || props.record.session.id)
   const showProjectName = () => props.showProjectName() && props.record.projectName
+  const status = (attention: boolean, loading: boolean): HomeSessionRowStatus =>
+    attention ? "questions" : loading ? "working" : "done"
+  const statusLabel = (value: HomeSessionRowStatus) => {
+    switch (value) {
+      case "questions":
+        return props.language.t("session.status.questions")
+      case "working":
+        return props.language.t("session.status.working")
+      default:
+        return props.language.t("session.status.done")
+    }
+  }
 
   return (
     <div
@@ -428,7 +442,7 @@ function HomeSessionRow(props: HomeSessionsViewProps & { record: HomeSessionReco
         data-component="home-session-row"
         class={`
           flex h-10 min-w-0 w-full flex-1 shrink-0 cursor-default items-center gap-2 rounded-[6px] border-0
-          bg-transparent py-3 pl-3 pr-10 text-left text-v2-text-text-muted [font-weight:530]
+          bg-transparent py-3 pl-3 text-left text-v2-text-text-muted [font-weight:530]
           transition-[background-color,color,box-shadow] duration-[120ms] ease-in-out
           hover:bg-v2-overlay-simple-overlay-hover focus-visible:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none
         `}
@@ -442,16 +456,30 @@ function HomeSessionRow(props: HomeSessionsViewProps & { record: HomeSessionReco
           props.onOpenSession(props.record.session, { background: true })
         }}
       >
-        <HomeSessionLeadingController
+        <HomeSessionStatusController
           server={props.server}
-          isOpenTab={props.isOpenTab}
           record={props.record}
-          revealProjectOnHover={!!showProjectName()}
+          isOpenTab={props.isOpenTab}
+          render={({ unread, loading, open, attention }) => {
+            const value = status(attention(), loading())
+            return (
+              <>
+                <HomeSessionLeading
+                  record={props.record}
+                  revealProjectOnHover={!!showProjectName()}
+                  open={open()}
+                  unread={unread()}
+                  loading={loading()}
+                />
+                <HomeSessionTitle title={title()} showProjectName={!!showProjectName()} />
+                <Show when={showProjectName()}>
+                  <HomeSessionProjectName name={props.record.projectName} />
+                </Show>
+                <HomeSessionStatusLabel value={value} label={statusLabel(value)} />
+              </>
+            )
+          }}
         />
-        <HomeSessionTitle title={title()} showProjectName={!!showProjectName()} />
-        <Show when={showProjectName()}>
-          <HomeSessionProjectName name={props.record.projectName} />
-        </Show>
       </button>
       <Show when={SHOW_HOME_SESSION_ARCHIVE}>
         <div
@@ -502,6 +530,21 @@ function HomeSessionProjectName(props: { name: string; search?: boolean }) {
       classList={{ "text-[13px] leading-4 tracking-[-0.04px]": !!props.search }}
     >
       {props.name}
+    </span>
+  )
+}
+
+function HomeSessionStatusLabel(props: { value: HomeSessionRowStatus; label: string }) {
+  return (
+    <span
+      class="shrink-0 pr-10 text-[11px] leading-3 tracking-[-0.04px] [font-weight:440]"
+      classList={{
+        "text-v2-text-text-faint": props.value === "done",
+        "text-v2-state-fg-warning": props.value === "questions",
+        "text-v2-text-text-base": props.value === "working",
+      }}
+    >
+      {props.label}
     </span>
   )
 }

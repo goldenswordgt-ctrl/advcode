@@ -796,6 +796,9 @@ export const dict = {
   "session.files.binaryContent": "Berkas biner (konten tidak dapat ditampilkan)",
 
   "session.messages.renderEarlier": "Tampilkan pesan sebelumnya",
+  "session.status.working": "Working",
+  "session.status.questions": "Questions",
+  "session.status.done": "Done",
   "session.messages.loadingEarlier": "Memuat pesan sebelumnya...",
   "session.messages.loadEarlier": "Muat pesan sebelumnya",
   "session.messages.loading": "Memuat pesan...",
