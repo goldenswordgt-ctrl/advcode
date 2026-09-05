@@ -9,6 +9,7 @@ import { Account } from "@/account/account"
 import { Config } from "@/config/config"
 import { Git } from "@/git"
 import { Ripgrep } from "@opencode-ai/core/ripgrep"
+import { SemanticIndex } from "@opencode-ai/core/semantic-index/semantic-index"
 import { Storage } from "@/storage/storage"
 import { Snapshot } from "@/snapshot"
 import { Plugin } from "@/plugin"
@@ -108,7 +109,7 @@ export const AppLayer = AppNodeBuilderV1.build(
     ShareNext.node,
     SessionShare.node,
   ]),
-).pipe(Layer.provideMerge(AppNodeBuilderV1.build(Ripgrep.node)), Layer.provideMerge(Observability.layer))
+).pipe(Layer.provideMerge(AppNodeBuilderV1.build(Ripgrep.node)), Layer.provideMerge(AppNodeBuilderV1.build(SemanticIndex.node)), Layer.provideMerge(Observability.layer))
 
 const rt = ManagedRuntime.make(AppLayer, { memoMap })
 type Runtime = Pick<typeof rt, "runSync" | "runPromise" | "runPromiseExit" | "runFork" | "runCallback" | "dispose">

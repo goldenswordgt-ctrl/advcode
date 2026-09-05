@@ -27,6 +27,7 @@ import { Plugin } from "../plugin"
 import { Provider } from "@/provider/provider"
 
 import { WebSearchTool } from "./websearch"
+import { SemanticSearchTool } from "./semantic-search"
 import { LspTool } from "./lsp"
 import * as Truncate from "./truncate"
 import { ApplyPatchTool } from "./apply_patch"
@@ -55,6 +56,7 @@ import { ModelV2 } from "@opencode-ai/core/model"
 import { MCP } from "@/mcp"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { McpCatalog } from "@/mcp/catalog"
+import { SemanticIndex } from "@opencode-ai/core/semantic-index/semantic-index"
 
 export function webSearchEnabled(providerID: ProviderV2.ID, flags = { exa: false, parallel: false }) {
   return (
@@ -113,6 +115,7 @@ const layer = Layer.effect(
     const writetool = yield* WriteTool
     const edit = yield* EditTool
     const greptool = yield* GrepTool
+    const semanticSearchTool = yield* SemanticSearchTool
     const patchtool = yield* ApplyPatchTool
     const skilltool = yield* SkillTool
     const browsertool = yield* BrowserTool
@@ -214,6 +217,7 @@ const layer = Layer.effect(
           read: Tool.init(read),
           glob: Tool.init(globtool),
           grep: Tool.init(greptool),
+          semantic_search: Tool.init(semanticSearchTool),
           edit: Tool.init(edit),
           write: Tool.init(writetool),
           task: Tool.init(task),
@@ -238,6 +242,7 @@ const layer = Layer.effect(
             tool.read,
             tool.glob,
             tool.grep,
+            tool.semantic_search,
             tool.edit,
             tool.write,
             tool.task,
@@ -453,6 +458,7 @@ export const node = LayerNode.make({
     MCP.node,
     Database.node,
     Ripgrep.node,
+    SemanticIndex.node,
   ],
 })
 

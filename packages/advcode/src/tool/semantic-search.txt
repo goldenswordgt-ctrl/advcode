@@ -1,0 +1,16 @@
+Searches the codebase with a semantic index, understanding code by meaning rather than literal text.
+
+Use semantic-search when trying to find code related to a concept, feature, or behavior, even when
+you don't know the exact names or symbols involved. It matches identifiers and nearby code
+contextually — for example, a query for "user auth handler" may find `handleUserAuth`,
+`authenticateUser`, or session validation logic scattered across files. It is not a keyword grep:
+it ranks its results, so the first hit is usually the best.
+
+Do NOT use semantic-search for:
+- Finding literal strings or exact regex matches — use grep instead.
+- Operations on specific, known file paths — read or edit those paths directly.
+- Searching a single file's contents verbatim — grep is cheaper.
+
+Provide natural queries describing what the code should do. The tool respects .gitignore and only
+indexes text files. Results are ranked by relevance; each result gives a file path, line range,
+and (when present) the symbol it belongs to.

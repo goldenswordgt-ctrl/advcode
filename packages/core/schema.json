@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "84a1ac82-448a-43b1-b697-a556034c2955",
+  "id": "395bd374-60bd-4faf-82fb-a74122dde7a0",
   "prevIds": [
-    "f14a9b18-8207-487e-a3d3-227e629ba9ad"
+    "84a1ac82-448a-43b1-b697-a556034c2955"
   ],
   "ddl": [
     {
@@ -64,6 +64,14 @@
     },
     {
       "name": "project",
+      "entityType": "tables"
+    },
+    {
+      "name": "semantic_index_chunk",
+      "entityType": "tables"
+    },
+    {
+      "name": "semantic_index_file",
       "entityType": "tables"
     },
     {
@@ -1105,6 +1113,126 @@
       "name": "commands",
       "entityType": "columns",
       "table": "project"
+    },
+    {
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": true,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "semantic_index_chunk"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "project_dir",
+      "entityType": "columns",
+      "table": "semantic_index_chunk"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "file_path",
+      "entityType": "columns",
+      "table": "semantic_index_chunk"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "start_line",
+      "entityType": "columns",
+      "table": "semantic_index_chunk"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "end_line",
+      "entityType": "columns",
+      "table": "semantic_index_chunk"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "symbol",
+      "entityType": "columns",
+      "table": "semantic_index_chunk"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "kind",
+      "entityType": "columns",
+      "table": "semantic_index_chunk"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "tokens",
+      "entityType": "columns",
+      "table": "semantic_index_chunk"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "project_dir",
+      "entityType": "columns",
+      "table": "semantic_index_file"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "file_path",
+      "entityType": "columns",
+      "table": "semantic_index_file"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "mtime_ms",
+      "entityType": "columns",
+      "table": "semantic_index_file"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "size",
+      "entityType": "columns",
+      "table": "semantic_index_file"
     },
     {
       "type": "text",
@@ -2218,6 +2346,16 @@
     },
     {
       "columns": [
+        "project_dir",
+        "file_path"
+      ],
+      "nameExplicit": false,
+      "name": "semantic_index_file_pk",
+      "entityType": "pks",
+      "table": "semantic_index_file"
+    },
+    {
+      "columns": [
         "session_id",
         "position"
       ],
@@ -2341,6 +2479,15 @@
       "nameExplicit": false,
       "name": "project_pk",
       "table": "project",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "semantic_index_chunk_pk",
+      "table": "semantic_index_chunk",
       "entityType": "pks"
     },
     {
@@ -2569,6 +2716,20 @@
       "name": "permission_project_action_resource_idx",
       "entityType": "indexes",
       "table": "permission"
+    },
+    {
+      "columns": [
+        {
+          "value": "project_dir",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "semantic_index_chunk_project_idx",
+      "entityType": "indexes",
+      "table": "semantic_index_chunk"
     },
     {
       "columns": [

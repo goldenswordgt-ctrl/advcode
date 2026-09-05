@@ -43,5 +43,6 @@ export const migrations = (
     import("./migration/20260902090000_opencode2_memory_layer"),
     import("./migration/20260903000000_session_transcript"),
     import("./migration/20260905063008_session-drain"),
+    import("./migration/20260905091439_deep_shocker"),
   ])
 ).map((module) => module.default) satisfies DatabaseMigration.Migration[]
