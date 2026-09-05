@@ -43,6 +43,8 @@ import { AfkCommand } from "./cli/cmd/afk"
 import { TranscriptListCommand, TranscriptGetCommand } from "./cli/cmd/transcript"
 import { WorktreeCommand } from "./cli/cmd/worktree"
 import { CheckpointCommand } from "./cli/cmd/checkpoint"
+import { WatchCommand } from "./cli/cmd/watch"
+import { MemoryBankCommand } from "./cli/cmd/memory-bank"
 import { Heap } from "./cli/heap"
 
 const args = hideBin(process.argv)
@@ -137,6 +139,8 @@ const cli = yargs(args)
   .command(AfkCommand)
   .command(WorktreeCommand)
   .command(CheckpointCommand)
+  .command(WatchCommand)
+  .command(MemoryBankCommand)
   .command({
     command: "transcript",
     describe: "manage session transcripts",
