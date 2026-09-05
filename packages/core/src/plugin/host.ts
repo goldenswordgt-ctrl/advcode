@@ -13,6 +13,7 @@ import { PluginV2 } from "../plugin"
 import { ProviderV2 } from "../provider"
 import { Reference } from "../reference"
 import type { DeepMutable } from "../schema"
+import { SessionHooks } from "../session/hooks"
 import { SkillV2 } from "../skill"
 
 const mutable = <T>(value: T) => value as DeepMutable<T>
@@ -24,6 +25,7 @@ export const make = Effect.fn("PluginHost.make")(function* (plugin: PluginV2.Int
   const commands = yield* CommandV2.Service
   const integration = yield* Integration.Service
   const reference = yield* Reference.Service
+  const sessionHooks = yield* SessionHooks.Service
   const skill = yield* SkillV2.Service
 
   return {
@@ -202,6 +204,27 @@ export const make = Effect.fn("PluginHost.make")(function* (plugin: PluginV2.Int
             add: (name, source) => draft.add(name, Schema.decodeUnknownSync(Reference.Source)(source)),
             remove: draft.remove,
             list: draft.list,
+          }),
+        ),
+    },
+    session: {
+      "prompt.before": (callback) =>
+        sessionHooks.hook.promptBefore((event) =>
+          callback({
+            sessionID: event.sessionID,
+            messageID: event.messageID,
+            delivery: event.delivery,
+            prompt: event.prompt,
+          }),
+        ),
+      "turn.after": (callback) =>
+        sessionHooks.hook.turnAfter((event) =>
+          callback({
+            sessionID: event.sessionID,
+            step: event.step,
+            finish: event.finish,
+            modelID: event.modelID,
+            providerID: event.providerID,
           }),
         ),
     },

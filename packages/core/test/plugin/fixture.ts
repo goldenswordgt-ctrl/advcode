@@ -14,6 +14,7 @@ import { Location } from "@opencode-ai/core/location"
 import { Npm } from "@opencode-ai/core/npm"
 import { PluginV2 } from "@opencode-ai/core/plugin"
 import { Reference } from "@opencode-ai/core/reference"
+import { SessionHooks } from "@opencode-ai/core/session/hooks"
 import { SkillV2 } from "@opencode-ai/core/skill"
 import { Effect, Layer } from "effect"
 import { tempLocationLayer } from "../fixture/location"
@@ -44,6 +45,7 @@ export const PluginTestLayer = AppNodeBuilder.build(
     Integration.node,
     Reference.node,
     SkillV2.node,
+    SessionHooks.node,
   ]),
   [
     [Location.node, tempLocationLayer],

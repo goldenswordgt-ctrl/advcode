@@ -30,6 +30,7 @@ import { SessionContextEpoch } from "../context-epoch"
 import { SessionCompaction } from "../compaction"
 import { SessionEvent } from "../event"
 import { SessionHistory } from "../history"
+import { SessionHooks } from "../hooks"
 import { SessionInput } from "../input"
 import { SessionSchema } from "../schema"
 import { SessionStore } from "../store"
@@ -102,6 +103,7 @@ const layer = Layer.effect(
     const models = yield* SessionRunnerModel.Service
     const store = yield* SessionStore.Service
     const location = yield* Location.Service
+    const sessionHooks = yield* SessionHooks.Service
     const systemContext = yield* SystemContextRegistry.Service
     const skillGuidance = yield* SkillGuidance.Service
     const referenceGuidance = yield* ReferenceGuidance.Service
@@ -346,6 +348,13 @@ const layer = Layer.effect(
                 files,
               }),
             )
+            yield* sessionHooks.runTurnAfter({
+              sessionID: session.id,
+              step: currentStep,
+              finish: stepSettlement.finish,
+              modelID: ModelV2.ID.make(model.id),
+              providerID: ProviderV2.ID.make(model.provider),
+            })
           }
           if (publisher.hasProviderError())
             yield* withPublication(publisher.failUnsettledTools("Tool execution interrupted"))
@@ -445,5 +454,6 @@ export const node = makeLocationNode({
     Config.node,
     Snapshot.node,
     Database.node,
+    SessionHooks.node,
   ],
 })
