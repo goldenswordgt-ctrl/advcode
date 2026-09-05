@@ -7,8 +7,11 @@ import {
   SystemPart,
   isContextOverflowFailure,
   type ProviderErrorEvent,
+  type ToolResultValue,
 } from "@opencode-ai/llm"
 import { Cause, DateTime, Effect, Exit, FiberSet, Layer, Option, Semaphore, Stream } from "effect"
+import { BackgroundJob } from "../../background-job"
+import { Identifier } from "../../id/id"
 import { AgentV2 } from "../../agent"
 import { Config } from "../../config"
 import { Database } from "../../database/database"
@@ -30,9 +33,12 @@ import { SessionContextEpoch } from "../context-epoch"
 import { SessionCompaction } from "../compaction"
 import { SessionDrain } from "../drain"
 import { SessionEvent } from "../event"
+import { SessionExecution } from "../execution"
 import { SessionHistory } from "../history"
 import { SessionHooks } from "../hooks"
 import { SessionInput } from "../input"
+import { SessionMessage } from "../message"
+import { Prompt } from "../prompt"
 import { SessionSchema } from "../schema"
 import { SessionStore } from "../store"
 import { type RunError, Service } from "./index"
@@ -94,6 +100,24 @@ import { llmClient } from "../../effect/app-node-platform"
  * explicit loop starts the next provider turn after local settlement. Configured agent step limits bound the loop.
  */
 
+/**
+ * Background tool calls are settled inside a process-local BackgroundJob so a
+ * single provider turn does not block on long-running work (shell commands,
+ * test runs). The turn records a running-marker tool result and ends; the job
+ * admits a durable completion steer that wakes the drain when it settles.
+ */
+const BACKGROUND_TOOLS = new Set<string>(["bash"])
+
+/** Renders a settlement result for the completion steer prompt. */
+function jobOutputText(result: ToolResultValue): string {
+  if (result.type === "text" && typeof result.value === "string") return result.value
+  if (result.type === "content") {
+    const parts = result.value as ReadonlyArray<{ type: "text"; text: string } | { type: "file"; uri: string }>
+    return parts.map((part) => (part.type === "text" ? part.text : `[file: ${part.uri}]`)).join("\n")
+  }
+  return JSON.stringify(result.value)
+}
+
 const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
@@ -105,6 +129,8 @@ const layer = Layer.effect(
     const store = yield* SessionStore.Service
     const location = yield* Location.Service
     const sessionHooks = yield* SessionHooks.Service
+    const execution = yield* SessionExecution.Service
+    const jobs = yield* BackgroundJob.Service
     const systemContext = yield* SystemContextRegistry.Service
     const skillGuidance = yield* SkillGuidance.Service
     const referenceGuidance = yield* ReferenceGuidance.Service
@@ -260,8 +286,64 @@ const layer = Layer.effect(
               yield* withPublication(publisher.failUnsettledTools("Tools are disabled after the maximum agent steps"))
               return
             }
-            needsContinuation = true
             const assistantMessageID = yield* publisher.assistantMessageID(event.id)
+            if (BACKGROUND_TOOLS.has(event.name)) {
+              // Long-running tool: settle inside a background job instead of
+              // blocking this provider turn. The turn records a running marker
+              // job id, the model is not asked to continue, and the job admits a
+              // durable completion steer that wakes the drain when it settles.
+              const jobID = Identifier.ascending("job")
+              const completionID = SessionMessage.ID.make(`msg_job_${jobID}`)
+              yield* jobs.start({
+                id: jobID,
+                type: "tool",
+                title: event.name,
+                metadata: {
+                  background: true,
+                  sessionID: session.id,
+                  tool: event.name,
+                  toolCallID: event.id,
+                },
+                run: Effect.gen(function* () {
+                  const outcome = yield* toolMaterialization
+                    .settle({
+                      sessionID: session.id,
+                      agent: agent.id,
+                      assistantMessageID,
+                      call: event,
+                    })
+                    .pipe(
+                      Effect.match({
+                        onSuccess: (settlement) => jobOutputText(settlement.result),
+                        onFailure: (error) =>
+                          `[background job ${jobID} ${event.name} failed: ${error instanceof Error ? error.message : String(error)}]`,
+                      }),
+                    )
+                  yield* SessionInput.admit(db, events, {
+                    id: completionID,
+                    sessionID: session.id,
+                    prompt: Prompt.make({
+                      text: `[background job ${jobID} ${event.name} settled]\n\n${outcome}`,
+                    }),
+                    delivery: "steer",
+                  }).pipe(Effect.ignore)
+                  yield* execution.wake(session.id).pipe(Effect.ignore)
+                  return outcome
+                }),
+              })
+              yield* publish(
+                LLMEvent.toolResult({
+                  id: event.id,
+                  name: event.name,
+                  result: {
+                    type: "text",
+                    value: `[background] ${event.name} running as job ${jobID}`,
+                  },
+                }),
+              )
+              return
+            }
+            needsContinuation = true
             yield* Effect.uninterruptibleMask((restore) =>
               restore(
                 toolMaterialization.settle({
@@ -462,5 +544,7 @@ export const node = makeLocationNode({
     Snapshot.node,
     Database.node,
     SessionHooks.node,
+    BackgroundJob.node,
+    SessionExecution.node,
   ],
 })
