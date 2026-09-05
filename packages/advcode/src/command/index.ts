@@ -8,7 +8,6 @@ import { Config } from "@/config/config"
 import { MCP } from "../mcp"
 import { Skill } from "../skill"
 import PROMPT_INITIALIZE from "./template/initialize.txt"
-import PROMPT_LIGHTWEIGHT from "./template/lightweight.txt"
 import PROMPT_REVIEW from "./template/review.txt"
 import { LegacyEvent } from "@opencode-ai/schema/legacy-event"
 
@@ -92,10 +91,14 @@ const layer = Layer.effect(
         name: Default.LIGHTWEIGHT,
         description: "apply the low-RAM minimal profile to this project",
         source: "command",
+        // Lightweight is a NATIVE CLI action (SessionPrompt.command direct
+        // execution) — it applies config + process changes without a model
+        // turn. This template stub exists only so the command stays listed;
+        // it must never be expanded into a prompt.
         get template() {
-          return PROMPT_LIGHTWEIGHT.replace("${path}", ctx.worktree)
+          return "Lightweight mode is applied directly by the CLI — no model turn is used."
         },
-        hints: hints(PROMPT_LIGHTWEIGHT),
+        hints: [],
       }
 
       for (const [name, command] of Object.entries(cfg.command ?? {})) {

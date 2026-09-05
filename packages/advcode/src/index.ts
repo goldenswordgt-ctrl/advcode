@@ -83,7 +83,7 @@ const cli = yargs(args)
   })
   .option("lightweight", {
     describe:
-      "low-RAM/low-CPU mode: disable plugins+hooks, background subagents, LSP, embedded UI, external skills, question tool, parallel, and all experimental subsystems",
+      "low-RAM/low-CPU mode: disable background subagents, LSP, embedded UI, external skills, question tool, parallel, and experimental subsystems (web access and small plugins stay available)",
     type: "boolean",
   })
   .middleware(async (opts) => {

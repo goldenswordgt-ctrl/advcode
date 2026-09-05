@@ -72,20 +72,23 @@ export type Info = Context.Service.Shape<typeof Service>
 // underlying config service, apply the override set, and return the folded Info.
 //
 // Purpose: a deterministic MINIMAL profile so low-RAM / low-CPU hosts only pay
-// for the core agent. Everything experimental or optional is forced off here —
-// even if an env var tried to enable it — and the profile composes the existing
+// for the core agent. Heavy and experimental subsystems are forced off — even
+// if an env var tried to enable them — and the profile composes the existing
 // per-subsystem flags rather than gating each wiring point individually.
 //
-// Not folded: in-process background tool settlement (core SessionRunner
-// BACKGROUND_TOOLS) is cheap and runs the tool either way — no extra process,
-// no heavy machinery — so it stays available even in lightweight mode.
+// Deliberately NOT folded:
+// - Web access (webfetch / websearch / mcp-websearch) — plain HTTP calls, cheap.
+//   Exa search stays available too (server-side work, not RAM).
+// - Plugins — lightweight mode disables heavy machinery, but small plugins (and
+//   the session hooks they carry) remain at the user's discretion. pure and
+//   disableDefaultPlugins are left alone.
+// - In-process background tool settlement (core SessionRunner BACKGROUND_TOOLS)
+//   is cheap and runs the tool either way — no extra process, no heavy
+//   machinery — so it stays available even in lightweight mode.
 const foldLightweight = (flags: Info): Info => {
   if (!flags.lightweight) return flags
   return {
     ...flags,
-    // Plugins + session hooks (in-process plugin machinery is a real RAM cost)
-    pure: true,
-    disableDefaultPlugins: true,
     // Embedded web UI and external skills
     disableEmbeddedWebUi: true,
     disableExternalSkills: true,
@@ -100,10 +103,9 @@ const foldLightweight = (flags: Info): Info => {
     experimentalBackgroundSubagents: false,
     // EventV2 projections (catalog/drain/durable markers)
     experimentalEventSystem: false,
-    // Parallel extension requests, interactive question tool, Exa search
+    // Parallel extension requests, interactive question tool
     enableParallel: false,
     enableQuestionTool: false,
-    enableExa: false,
     enableExperimentalModels: false,
     // All remaining experimental gates off for a fully deterministic profile
     experimentalReferences: false,

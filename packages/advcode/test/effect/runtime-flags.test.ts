@@ -393,8 +393,9 @@ describe("RuntimeFlags", () => {
       const flags = yield* readFlags.pipe(Effect.provide(fromConfig({ OPENCODE_LIGHTWEIGHT: "true" })))
 
       expect(flags.lightweight).toBe(true)
-      expect(flags.pure).toBe(true)
-      expect(flags.disableDefaultPlugins).toBe(true)
+      // Plugins are NOT folded: small plugins stay available in lightweight mode
+      expect(flags.pure).toBe(false)
+      expect(flags.disableDefaultPlugins).toBe(false)
       expect(flags.disableEmbeddedWebUi).toBe(true)
       expect(flags.disableExternalSkills).toBe(true)
       expect(flags.disableLspDownload).toBe(true)
@@ -406,7 +407,6 @@ describe("RuntimeFlags", () => {
       expect(flags.experimentalEventSystem).toBe(false)
       expect(flags.enableParallel).toBe(false)
       expect(flags.enableQuestionTool).toBe(false)
-      expect(flags.enableExa).toBe(false)
       expect(flags.enableExperimentalModels).toBe(false)
       expect(flags.experimentalReferences).toBe(false)
       expect(flags.experimentalOxfmt).toBe(false)
@@ -417,6 +417,31 @@ describe("RuntimeFlags", () => {
       expect(flags.experimentalNativeLlm).toBe(false)
       expect(flags.experimentalWebSockets).toBe(false)
       expect(flags.client).toBe("cli")
+    }),
+  )
+
+  it.effect("lightweight keeps web search and plugins enabled even when env sets them", () =>
+    Effect.gen(function* () {
+      const flags = yield* readFlags.pipe(
+        Effect.provide(
+          fromConfig({
+            OPENCODE_LIGHTWEIGHT: "true",
+            OPENCODE_PURE: "true",
+            OPENCODE_DISABLE_DEFAULT_PLUGINS: "1",
+            OPENCODE_ENABLE_EXA: "1",
+          }),
+        ),
+      )
+
+      expect(flags.lightweight).toBe(true)
+      // Web (Exa search) and plugin flags survive the fold untouched
+      expect(flags.enableExa).toBe(true)
+      expect(flags.pure).toBe(true)
+      expect(flags.disableDefaultPlugins).toBe(true)
+      // The rest of the fold still applies
+      expect(flags.enableQuestionTool).toBe(false)
+      expect(flags.disableEmbeddedWebUi).toBe(true)
+      expect(flags.experimentalLspTool).toBe(false)
     }),
   )
 
@@ -440,8 +465,9 @@ describe("RuntimeFlags", () => {
       const flags = yield* readFlags.pipe(Effect.provide(RuntimeFlags.layer({ lightweight: true })))
 
       expect(flags.lightweight).toBe(true)
-      expect(flags.pure).toBe(true)
-      expect(flags.disableDefaultPlugins).toBe(true)
+      // Plugins and web are not folded
+      expect(flags.pure).toBe(false)
+      expect(flags.disableDefaultPlugins).toBe(false)
       expect(flags.disableEmbeddedWebUi).toBe(true)
       expect(flags.disableExternalSkills).toBe(true)
       expect(flags.disableLspDownload).toBe(true)

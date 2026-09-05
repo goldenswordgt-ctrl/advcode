@@ -9,6 +9,7 @@ import { SessionRevert } from "./revert"
 import { Session } from "./session"
 import { Agent } from "../agent/agent"
 import { Provider } from "@/provider/provider"
+import { applyLightweight } from "./lightweight"
 
 import { type Tool as AITool, tool, jsonSchema } from "ai"
 import type { JSONSchema7 } from "@ai-sdk/provider"
@@ -1378,6 +1379,33 @@ const layer = Layer.effect(
           messageID: "" as any,
         })
         return { info: { id: ulid(), role: "user" as const, parts: [] } } as any
+      }
+
+      // Direct execution for lightweight mode — a real CLI action, not a prompt
+      // injection. Merges the lightweight profile into the project config and
+      // flips OPENCODE_LIGHTWEIGHT in this process so the running instance's
+      // runtime-flags fold takes effect without a model turn.
+      if (input.command === "lightweight") {
+        const ctx = yield* InstanceState.context
+        const result = yield* Effect.promise(() => applyLightweight(ctx.worktree))
+        process.env.OPENCODE_LIGHTWEIGHT = "1"
+        yield* events.publish(Command.Event.Executed, {
+          name: input.command,
+          sessionID: input.sessionID,
+          arguments: input.arguments,
+          messageID: "" as any,
+        })
+        const text =
+          `Lightweight mode applied — no model turn needed.\n\n` +
+          `Config: ${result.path}\n` +
+          `Tools denied: ${result.denies.join(", ")}\n` +
+          `Compaction: auto on\n\n` +
+          `The running process fold is active. Fully restart ADVCODE (or set OPENCODE_LIGHTWEIGHT=1) ` +
+          `so every subsystem — LSP, skills, UI, background subagents, event projections, parallel — ` +
+          `picks up the minimal profile on boot. Web access and plugins stay enabled.`
+        return {
+          info: { id: ulid(), role: "user" as const, parts: [{ type: "text" as const, text }] },
+        } as any
       }
 
       const cmd = yield* commands.get(input.command)
