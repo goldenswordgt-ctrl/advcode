@@ -102,7 +102,39 @@ const layer = Layer.effect(
       delete item.request.body.baseURL
     }
 
-    const state = State.create<Data, Draft>({
+    const publishCatalogDiff = (previous: Data, next: Draft) => {
+  const previousProviders = previous.providers
+  const nextProviders = new Map(next.provider.list().map((record) => [record.provider.id, record]))
+  return Effect.gen(function* () {
+    for (const providerID of nextProviders.keys()) {
+      if (!previousProviders.has(providerID)) {
+        yield* events.publish(Event.ProviderAdded, { providerID })
+      }
+    }
+    for (const providerID of previousProviders.keys()) {
+      if (!nextProviders.has(providerID)) {
+        yield* events.publish(Event.ProviderRemoved, { providerID })
+      }
+    }
+    for (const [providerID, record] of nextProviders) {
+      const previousRecord = previousProviders.get(providerID)
+      for (const modelID of record.models.keys()) {
+        if (previousRecord?.models.has(modelID)) continue
+        yield* events.publish(Event.ModelAdded, { providerID, modelID })
+      }
+    }
+    for (const [providerID, record] of previousProviders) {
+      const nextRecord = nextProviders.get(providerID)
+      for (const modelID of record.models.keys()) {
+        if (nextRecord?.models.has(modelID)) continue
+        yield* events.publish(Event.ModelRemoved, { providerID, modelID })
+      }
+    }
+  })
+}
+
+let state: State.Interface<Data, Draft>
+state = State.create<Data, Draft>({
       initial: () => ({ providers: new Map() }),
       draft: (draft) => {
         const result: Draft = {
@@ -165,6 +197,7 @@ const layer = Layer.effect(
             }
           }
         }
+        yield* publishCatalogDiff(state.get(), catalog)
         yield* events.publish(Event.Updated, {})
       }),
     })

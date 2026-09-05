@@ -1,5 +1,5 @@
 import { describe, expect } from "bun:test"
-import { Effect, Fiber, Layer, Stream } from "effect"
+import { Effect, Fiber, Layer, Queue, Stream } from "effect"
 import { Catalog } from "@opencode-ai/core/catalog"
 import { Integration } from "@opencode-ai/core/integration"
 import { Credential } from "@opencode-ai/core/credential"
@@ -348,6 +348,44 @@ describe("CatalogV2", () => {
       expect(yield* catalog.provider.all()).toEqual([])
       expect(yield* catalog.model.all()).toEqual([])
       expect(yield* catalog.provider.get(providerID)).toBeUndefined()
+    }),
+  )
+
+  it.effect("publishes granular added and removed events for providers and models", () =>
+    Effect.gen(function* () {
+      const catalog = yield* Catalog.Service
+      const events = yield* EventV2.Service
+      const queue = yield* Queue.unbounded<EventV2.Payload>()
+      const unsubscribe = yield* events.listen((event) => Queue.offer(queue, event))
+      yield* Effect.addFinalizer(() => unsubscribe)
+
+      const providerID = ProviderV2.ID.make("granular")
+      const modelID = ModelV2.ID.make("granular-model")
+      yield* catalog.transform((editor) => {
+        editor.provider.update(providerID, () => {})
+        editor.model.update(providerID, modelID, () => {})
+      })
+      yield* catalog.transform((editor) => editor.model.remove(providerID, modelID))
+      yield* catalog.transform((editor) => editor.provider.remove(providerID))
+
+      const payloads: EventV2.Payload[] = []
+      for (let index = 0; index < 7; index++) {
+        payloads.push(yield* Queue.take(queue))
+      }
+
+      expect(payloads.map((event) => event.type)).toEqual([
+        "catalog.provider.added",
+        "catalog.model.added",
+        "catalog.updated",
+        "catalog.model.removed",
+        "catalog.updated",
+        "catalog.provider.removed",
+        "catalog.updated",
+      ])
+      expect(payloads[0]).toMatchObject({ type: "catalog.provider.added", data: { providerID } })
+      expect(payloads[1]).toMatchObject({ type: "catalog.model.added", data: { providerID, modelID } })
+      expect(payloads[3]).toMatchObject({ type: "catalog.model.removed", data: { providerID, modelID } })
+      expect(payloads[5]).toMatchObject({ type: "catalog.provider.removed", data: { providerID } })
     }),
   )
 })
