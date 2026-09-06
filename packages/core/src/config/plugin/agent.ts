@@ -33,6 +33,7 @@ const pathActions = ["external_directory", "read", "edit"] as const satisfies re
 const agentKeys = new Set([
   "model",
   "small_model",
+  "advisor_model",
   "variant",
   "request",
   "system",
@@ -104,6 +105,10 @@ export const Plugin = define({
                 const small = ModelV2.parse(item.small_model)
                 agent.smallModel = { id: small.modelID, providerID: small.providerID }
               }
+              if (item.advisor_model !== undefined) {
+                const advisor = ModelV2.parse(item.advisor_model)
+                agent.advisorModel = { id: advisor.modelID, providerID: advisor.providerID }
+              }
               if (item.variant !== undefined && agent.model !== undefined) {
                 agent.model.variant = ModelV2.VariantID.make(item.variant)
               }
@@ -133,6 +138,10 @@ export const Plugin = define({
             if (selected.small_model !== undefined) {
               const small = ModelV2.parse(selected.small_model)
               agent.smallModel = { id: small.modelID, providerID: small.providerID }
+            }
+            if (selected.advisor_model !== undefined) {
+              const advisor = ModelV2.parse(selected.advisor_model)
+              agent.advisorModel = { id: advisor.modelID, providerID: advisor.providerID }
             }
           })
         }

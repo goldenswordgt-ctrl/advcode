@@ -15,6 +15,9 @@ export class Info extends Schema.Class<Info>("ConfigV2.Agent")({
   small_model: Schema.String.pipe(Schema.optional).annotate({
     description: "Model used for continuation turns after the first provider turn (architect/editor split).",
   }),
+  advisor_model: Schema.String.pipe(Schema.optional).annotate({
+    description: "Second model that reviews each assistant turn and logs findings (advisor review).",
+  }),
   variant: Schema.String.pipe(Schema.optional),
   request: ConfigProvider.Request.pipe(Schema.optional),
   system: Schema.String.pipe(Schema.optional),

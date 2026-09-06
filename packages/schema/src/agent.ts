@@ -21,6 +21,7 @@ export const Info = Schema.Struct({
   id: ID,
   model: Model.Ref.pipe(optional),
   smallModel: Model.Ref.pipe(optional),
+  advisorModel: Model.Ref.pipe(optional),
   request: Provider.Request,
   system: Schema.String.pipe(optional),
   description: Schema.String.pipe(optional),

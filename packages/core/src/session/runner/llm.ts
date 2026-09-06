@@ -43,6 +43,7 @@ import { SessionSchema } from "../schema"
 import { SessionStore } from "../store"
 import { type RunError, Service } from "./index"
 import { SessionRunnerModel } from "./model"
+import { SessionAdvisor } from "../advisor"
 import { createLLMEventPublisher } from "./publish-llm-event"
 import { toLLMMessages } from "./to-llm-message"
 import { MAX_STEPS_PROMPT } from "./max-steps"
@@ -284,6 +285,7 @@ const layer = Layer.effect(
       const publish = (event: LLMEvent, outputPaths: ReadonlyArray<string> = []) =>
         withPublication(publisher.publish(event, outputPaths))
       let overflowFailure: ProviderErrorEvent | undefined
+      let turnText = ""
       const providerStream = llm.stream(request).pipe(
         Stream.runForEach((event) =>
           Effect.gen(function* () {
@@ -294,6 +296,7 @@ const layer = Layer.effect(
                 return
               }
             }
+            if (event.type === "text-delta") turnText += event.text
             yield* publish(event)
             if (event.type !== "tool-call" || event.providerExecuted) return
             if (!toolMaterialization) {
@@ -452,6 +455,13 @@ const layer = Layer.effect(
               modelID: ModelV2.ID.make(model.id),
               providerID: ProviderV2.ID.make(model.provider),
             })
+            const advisorModel = agent.info?.advisorModel
+            if (process.env.OPENCODE_ADVISOR === "1" && advisorModel !== undefined && turnText.length > 0) {
+              const advisorRoute = yield* models.resolveModel(advisorModel).pipe(Effect.option)
+              if (Option.isSome(advisorRoute)) {
+                yield* SessionAdvisor.review(llm, advisorRoute.value, turnText, session.id)
+              }
+            }
           }
           if (publisher.hasProviderError())
             yield* withPublication(publisher.failUnsettledTools("Tool execution interrupted"))

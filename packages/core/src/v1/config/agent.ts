@@ -15,6 +15,9 @@ const AgentSchema = Schema.StructWithRest(
     small_model: Schema.optional(Schema.String).annotate({
       description: "Model used for continuation turns after the first provider turn (architect/editor split).",
     }),
+    advisor_model: Schema.optional(Schema.String).annotate({
+      description: "Second model that reviews each assistant turn and logs findings (advisor review).",
+    }),
     variant: Schema.optional(Schema.String).annotate({
       description: "Default model variant for this agent (applies only when using the agent's configured model).",
     }),
@@ -47,6 +50,7 @@ const KNOWN_KEYS = new Set([
   "name",
   "model",
   "small_model",
+  "advisor_model",
   "variant",
   "prompt",
   "description",

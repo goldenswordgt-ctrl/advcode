@@ -46,6 +46,7 @@ describe("ConfigProfile", () => {
                       description: "CI hardening",
                       model: "anthropic/claude-haiku",
                       small_model: "openai/gpt-mini",
+                      advisor_model: "openai/gpt-mini",
                       tools: { edit: false, bash: true },
                     },
                   },
@@ -63,6 +64,7 @@ describe("ConfigProfile", () => {
         expect(build).toMatchObject({
           model: { providerID: "anthropic", id: "claude-haiku", variant: undefined },
           smallModel: { providerID: "openai", id: "gpt-mini" },
+          advisorModel: { providerID: "openai", id: "gpt-mini" },
         })
         const permissions = build.permissions
         expect(permissions).toContainEqual({ action: "edit", resource: "*", effect: "allow" })

@@ -1765,6 +1765,7 @@ export type PermissionConfig =
 export type AgentConfig = {
   model?: string
   small_model?: string
+  advisor_model?: string
   variant?: string
   temperature?: number
   top_p?: number
@@ -4526,6 +4527,7 @@ export type AgentV2Info = {
   id: string
   model?: ModelRef
   smallModel?: ModelRef
+  advisorModel?: ModelRef
   request: ProviderRequest
   system?: string
   description?: string

@@ -77,12 +77,32 @@ export interface Interface {
     session: SessionSchema.Info,
     opts?: { readonly preferSmall?: boolean },
   ) => Effect.Effect<Model, Error>
+  readonly resolveModel: (
+    model: NonNullable<AgentV2.Info["advisorModel"]>,
+  ) => Effect.Effect<
+    Model,
+    ModelUnavailableError | UnsupportedApiError | VariantUnavailableError | Integration.AuthorizationError
+  >
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/v2/SessionRunnerModel") {}
 
 /** Test or embedding seam for supplying a model resolver directly. */
-export const layerWith = (resolve: Interface["resolve"]) => Layer.succeed(Service, Service.of({ resolve }))
+export const layerWith = (resolve: Interface["resolve"]) =>
+  Layer.succeed(
+    Service,
+    Service.of({
+      resolve,
+      resolveModel: () =>
+        Effect.failSync(
+          () =>
+            new ModelUnavailableError({
+              providerID: ProviderV2.ID.make("seam"),
+              modelID: ModelV2.ID.make("seam"),
+            }),
+        ),
+    }),
+  )
 
 const apiKey = (model: ModelV2.Info, credential?: Credential.Value) => {
   if (credential?.type === "key") return Auth.value(credential.key)
@@ -246,6 +266,23 @@ export const locationLayer = Layer.effect(
         )
         return yield* resolve(
           session,
+          selected,
+          connection ? yield* integrations.connection.resolve(connection) : undefined,
+        )
+      }),
+      resolveModel: Effect.fn("SessionRunnerModel.resolveModel")(function* (ref) {
+        // Resolves an arbitrary configured model reference (advisor review) with the
+        // same no-variant mechanics as the editor model. Fail-open at the call site.
+        const selected = (yield* catalog.model.available()).find(
+          (model) => model.providerID === ref.providerID && model.id === ref.id,
+        )
+        if (!selected || !supported(selected))
+          return yield* new ModelUnavailableError({ providerID: ref.providerID, modelID: ref.id })
+        const provider = yield* catalog.provider.get(selected.providerID)
+        const connection = yield* integrations.connection.active(
+          provider?.integrationID ?? Integration.ID.make(selected.providerID),
+        )
+        return yield* resolveSmall(
           selected,
           connection ? yield* integrations.connection.resolve(connection) : undefined,
         )

@@ -131,6 +131,7 @@ export type AgentsListOutput = {
     readonly id: string
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
     readonly smallModel?: { readonly id: string; readonly providerID: string; readonly variant?: string }
+    readonly advisorModel?: { readonly id: string; readonly providerID: string; readonly variant?: string }
     readonly request: {
       readonly headers: { readonly [x: string]: string }
       readonly body: { readonly [x: string]: JsonValue }

@@ -13,6 +13,9 @@ export class Info extends Schema.Class<Info>("Config.Profile.Info")({
   small_model: Schema.String.pipe(Schema.optional).annotate({
     description: "Editor model override applied to the default agent",
   }),
+  advisor_model: Schema.String.pipe(Schema.optional).annotate({
+    description: "Advisor review model override applied to the default agent",
+  }),
   tools: Schema.Record(Schema.String, Schema.Boolean).pipe(Schema.optional).annotate({
     description:
       "Tool permission overrides: false denies the tool, true allows it. Applied after all other permission rules, so a profile can tighten or widen any tool",
