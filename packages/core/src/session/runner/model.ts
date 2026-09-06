@@ -8,6 +8,7 @@ import * as OpenAIResponses from "@opencode-ai/llm/protocols/openai-responses"
 import { Auth, type AnyRoute } from "@opencode-ai/llm/route"
 import { Context, Effect, Layer, Schema } from "effect"
 import { produce } from "immer"
+import { AgentV2 } from "../../agent"
 import { Catalog } from "../../catalog"
 import { Credential } from "../../credential"
 import { Integration } from "../../integration"
@@ -72,7 +73,10 @@ export type Error =
   | Integration.AuthorizationError
 
 export interface Interface {
-  readonly resolve: (session: SessionSchema.Info) => Effect.Effect<Model, Error>
+  readonly resolve: (
+    session: SessionSchema.Info,
+    opts?: { readonly preferSmall?: boolean },
+  ) => Effect.Effect<Model, Error>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/v2/SessionRunnerModel") {}
@@ -172,6 +176,14 @@ export const fromCatalogModel = (
 export const resolve = (session: SessionSchema.Info, model: ModelV2.Info, credential?: Credential.Value) =>
   withVariant(model, session.model?.variant).pipe(Effect.flatMap((model) => fromCatalogModel(model, credential)))
 
+/**
+ * Resolves the agent's configured editor model (small_model) for continuation
+ * turns. The editor model is resolved WITHOUT the main model's variant so an
+ * architect variant never leaks into the cheap editor request.
+ */
+export const resolveSmall = (model: ModelV2.Info, credential?: Credential.Value) =>
+  withVariant(model, undefined).pipe(Effect.flatMap((model) => fromCatalogModel(model, credential)))
+
 export const supported = (model: ModelV2.Info) =>
   model.api.type === "aisdk" &&
   (model.api.package === "@ai-sdk/openai" ||
@@ -184,8 +196,35 @@ export const locationLayer = Layer.effect(
   Effect.gen(function* () {
     const catalog = yield* Catalog.Service
     const integrations = yield* Integration.Service
+    const agents = yield* AgentV2.Service
     return Service.of({
-      resolve: Effect.fn("SessionRunnerModel.resolve")(function* (session) {
+      resolve: Effect.fn("SessionRunnerModel.resolve")(function* (session, opts) {
+        // Continuation turns (tool loops) resolve the agent's editor model when
+        // small_model is configured; the architect model owns the first turn.
+        if (opts?.preferSmall && session.agent !== undefined) {
+          const agent = yield* agents.get(session.agent)
+          const small = agent?.smallModel
+          if (small !== undefined) {
+            const selected = (yield* catalog.model.available()).find(
+              (model) => model.providerID === small.providerID && model.id === small.id,
+            )
+            if (selected && supported(selected)) {
+              const provider = yield* catalog.provider.get(selected.providerID)
+              const connection = yield* integrations.connection.active(
+                provider?.integrationID ?? Integration.ID.make(selected.providerID),
+              )
+              return yield* resolveSmall(
+                selected,
+                connection ? yield* integrations.connection.resolve(connection) : undefined,
+              )
+            }
+            yield* Effect.logWarning("small_model unavailable; falling back to session model", {
+              sessionID: session.id,
+              providerID: small.providerID,
+              modelID: small.id,
+            })
+          }
+        }
         // Location plugins populate and filter the catalog asynchronously during layer startup.
         const defaultModel = session.model ? undefined : yield* catalog.model.default()
         const selected = session.model
@@ -215,4 +254,8 @@ export const locationLayer = Layer.effect(
   }),
 )
 
-export const node = makeLocationNode({ service: Service, layer: locationLayer, deps: [Catalog.node, Integration.node] })
+export const node = makeLocationNode({
+  service: Service,
+  layer: locationLayer,
+  deps: [Catalog.node, Integration.node, AgentV2.node],
+})

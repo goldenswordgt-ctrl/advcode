@@ -199,10 +199,9 @@ const layer = Layer.effect(
       new TurnTransitionError({ _tag: "ContinueAfterOverflowCompaction", step })
 
     const loadSystemContext = (agent: AgentV2.Selection) =>
-      Effect.all(
-        [systemContext.load(), skillGuidance.load(agent), referenceGuidance.load(), repoMapGuidance.load()],
-        { concurrency: "unbounded" },
-      ).pipe(Effect.map(SystemContext.combine))
+      Effect.all([systemContext.load(), skillGuidance.load(agent), referenceGuidance.load(), repoMapGuidance.load()], {
+        concurrency: "unbounded",
+      }).pipe(Effect.map(SystemContext.combine))
 
     const runTurnAttempt = Effect.fn("SessionRunner.runTurn")(function* (
       sessionID: SessionSchema.ID,
@@ -230,7 +229,18 @@ const layer = Layer.effect(
       }
       const system =
         initialized ?? (yield* SessionContextEpoch.prepare(db, events, loadSystemContext(agent), session.id))
-      const model = yield* models.resolve(session)
+      // Architect/editor split: the first provider turn plans with the session
+      // model; continuation turns (tool loops) downgrade to the agent's
+      // small_model when configured.
+      const preferSmall = currentStep > 1
+      const model = yield* models.resolve(session, preferSmall ? { preferSmall: true } : undefined)
+      if (preferSmall) {
+        yield* Effect.logInfo("continuation turn model", {
+          sessionID: session.id,
+          providerID: model.provider,
+          modelID: model.id,
+        })
+      }
       const entries = yield* SessionHistory.entriesForRunner(db, session.id, system.baselineSeq)
       const context = entries.map((entry) => entry.message)
       const isLastStep = agent.info?.steps !== undefined && currentStep >= agent.info.steps
@@ -256,13 +266,17 @@ const layer = Layer.effect(
       if (yield* compaction.compactIfNeeded({ sessionID: session.id, entries, model, request }))
         return yield* Effect.die(continueAfterCompaction(currentStep))
       const startSnapshot = yield* snapshots.capture()
+      const sameAsStored =
+        session.model !== undefined &&
+        ProviderV2.ID.make(model.provider) === session.model.providerID &&
+        ModelV2.ID.make(model.id) === session.model.id
       const publisher = createLLMEventPublisher(events, {
         sessionID: session.id,
         agent: agent.id,
         model: {
           id: ModelV2.ID.make(model.id),
           providerID: ProviderV2.ID.make(model.provider),
-          ...(session.model?.variant === undefined ? {} : { variant: session.model.variant }),
+          ...(sameAsStored && session.model?.variant !== undefined ? { variant: session.model.variant } : {}),
         },
         snapshot: startSnapshot,
       })
@@ -507,9 +521,7 @@ const layer = Layer.effect(
             yield* SessionDrain.heartbeat(db, input.sessionID, step)
             if (!needsContinuation) needsContinuation = yield* SessionInput.hasPending(db, input.sessionID, "steer")
           }
-          yield* selfLearning
-            .learnFromTurn({ sessionID: input.sessionID, worked: true })
-            .pipe(Effect.forkDetach)
+          yield* selfLearning.learnFromTurn({ sessionID: input.sessionID, worked: true }).pipe(Effect.forkDetach)
           shouldRun = yield* SessionInput.hasPending(db, input.sessionID, "queue")
           promotion = shouldRun ? "queue" : undefined
         }

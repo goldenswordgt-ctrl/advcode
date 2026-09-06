@@ -130,6 +130,7 @@ export type AgentsListOutput = {
   readonly data: ReadonlyArray<{
     readonly id: string
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
+    readonly smallModel?: { readonly id: string; readonly providerID: string; readonly variant?: string }
     readonly request: {
       readonly headers: { readonly [x: string]: string }
       readonly body: { readonly [x: string]: JsonValue }
@@ -261,6 +262,7 @@ export type SessionsListOutput = {
         readonly deletions: number
         readonly patch: string
       }>
+      readonly mode?: "code" | "convo" | "both"
     }
   }>
   readonly cursor: { readonly previous?: string | null; readonly next?: string | null }
@@ -323,6 +325,7 @@ export type SessionsCreateOutput = {
         readonly deletions: number
         readonly patch: string
       }>
+      readonly mode?: "code" | "convo" | "both"
     }
   }
 }["data"]
@@ -361,6 +364,7 @@ export type SessionsGetOutput = {
         readonly deletions: number
         readonly patch: string
       }>
+      readonly mode?: "code" | "convo" | "both"
     }
   }
 }["data"]
@@ -509,6 +513,7 @@ export type SessionsStageOutput = {
       readonly deletions: number
       readonly patch: string
     }>
+    readonly mode?: "code" | "convo" | "both"
   }
 }["data"]
 
@@ -1113,6 +1118,7 @@ export type SessionsHistoryOutput = {
               readonly deletions: number
               readonly patch: string
             }>
+            readonly mode?: "code" | "convo" | "both"
           }
         }
       }
@@ -1571,6 +1577,7 @@ export type SessionsEventsOutput =
             readonly deletions: number
             readonly patch: string
           }>
+          readonly mode?: "code" | "convo" | "both"
         }
       }
     }

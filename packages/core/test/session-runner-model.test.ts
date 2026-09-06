@@ -142,6 +142,25 @@ describe("SessionRunnerModel", () => {
     }),
   )
 
+  it.effect("resolves the editor model without the architect variant", () =>
+    Effect.gen(function* () {
+      const catalog = model({ type: "aisdk", package: "@ai-sdk/openai", url: "https://openai.example/v1" }, [
+        {
+          id: ModelV2.VariantID.make("high"),
+          headers: { "x-variant": "high" },
+          body: { reasoning: { effort: "high" } },
+        },
+      ])
+
+      const resolved = yield* SessionRunnerModel.resolveSmall(catalog)
+
+      expect(resolved).toMatchObject({ id: "api-test-model" })
+      expect(resolved.route.defaults).toMatchObject({ headers: { "x-test": "header" } })
+      expect(resolved.route.defaults.headers?.["x-variant"]).toBeUndefined()
+      expect(resolved.route.defaults.http?.body).toEqual({ custom_extension: { enabled: true } })
+    }),
+  )
+
   it.effect("overlays selected OpenAI-compatible Session variant bodies", () =>
     Effect.gen(function* () {
       const catalog = model(

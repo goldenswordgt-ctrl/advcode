@@ -199,6 +199,39 @@ describe("ConfigAgentPlugin.Plugin", () => {
     }),
   )
 
+  it.effect("maps small_model to the editor model ref", () =>
+    Effect.gen(function* () {
+      const agents = yield* AgentV2.Service
+      const config = Config.Service.of({
+        entries: () =>
+          Effect.succeed([
+            new Config.Document({
+              type: "document",
+              info: decode({
+                agents: {
+                  build: {
+                    model: "anthropic/claude-sonnet",
+                    small_model: "openai/gpt-mini",
+                  },
+                },
+              }),
+            }),
+          ]),
+      })
+
+      yield* ConfigAgentPlugin.Plugin.effect(host({ agent: agentHost(agents) })).pipe(
+        Effect.provideService(Config.Service, config),
+      )
+
+      const build = yield* agents.get(AgentV2.ID.make("build"))
+      if (!build) throw new Error("expected configured build agent")
+      expect(build).toMatchObject({
+        model: { providerID: "anthropic", id: "claude-sonnet", variant: undefined },
+        smallModel: { providerID: "openai", id: "gpt-mini" },
+      })
+    }),
+  )
+
   it.effect("removes a built-in agent disabled by configuration", () =>
     Effect.gen(function* () {
       const agents = yield* AgentV2.Service
