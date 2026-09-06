@@ -7,6 +7,7 @@ import { AgentV2 } from "../../agent"
 import { Config } from "../../config"
 import { ConfigAgent } from "../agent"
 import { ConfigMarkdown } from "../markdown"
+import { ConfigProfile } from "../profile"
 import { FSUtil } from "../../fs-util"
 import { ModelV2 } from "../../model"
 import { ConfigAgentV1 } from "../../v1/config/agent"
@@ -68,12 +69,18 @@ export const Plugin = define({
             )
           })
         }).pipe(Effect.map((documents) => documents.flat()))
+        const profileName = process.env.OPENCODE_PROFILE
+        const selected = profileName === undefined ? undefined : Config.latest(documents, "profiles")?.[profileName]
+        if (profileName !== undefined && selected === undefined) {
+          yield* Effect.logWarning(`config profile "${profileName}" is not defined in configuration`)
+        }
         const permissions = expandPermissions(
           documents.flatMap((document) => document.info.permissions ?? []),
           global.home,
-        )
+        ).concat(ConfigProfile.applyTools(selected?.tools))
         const configuredDefault = Config.latest(documents, "default_agent")
-        if (configuredDefault !== undefined) draft.default(AgentV2.ID.make(configuredDefault))
+        const defaultID = configuredDefault === undefined ? AgentV2.defaultID : AgentV2.ID.make(configuredDefault)
+        if (configuredDefault !== undefined) draft.default(defaultID)
         for (const current of draft.list()) {
           draft.update(current.id, (agent) => agent.permissions.push(...permissions))
         }
@@ -115,6 +122,19 @@ export const Plugin = define({
               }
             })
           }
+        }
+
+        if (selected !== undefined) {
+          draft.update(defaultID, (agent) => {
+            if (selected.model !== undefined) {
+              const model = ModelV2.parse(selected.model)
+              agent.model = { id: model.modelID, providerID: model.providerID, variant: agent.model?.variant }
+            }
+            if (selected.small_model !== undefined) {
+              const small = ModelV2.parse(selected.small_model)
+              agent.smallModel = { id: small.modelID, providerID: small.providerID }
+            }
+          })
         }
       }),
     )

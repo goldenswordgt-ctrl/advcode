@@ -19,6 +19,7 @@ import { ConfigFormatter } from "./config/formatter"
 import { ConfigLSP } from "./config/lsp"
 import { ConfigMCP } from "./config/mcp"
 import { ConfigPlugin } from "./config/plugin"
+import { ConfigProfile } from "./config/profile"
 import { ConfigProvider } from "./config/provider"
 import { ConfigReference } from "./config/reference"
 import { ConfigToolOutput } from "./config/tool-output"
@@ -61,14 +62,16 @@ export class Info extends Schema.Class<Info>("Config.Info")({
   permissions: Permission.Ruleset.pipe(Schema.optional).annotate({
     description: "Ordered tool permission rules applied to agent tool use",
   }),
-  sandbox: Schema.Literals(["read-only", "workspace-write", "full"])
-    .pipe(Schema.optional)
-    .annotate({
-      description:
-        "Sandbox mode governing what the agent may touch. read-only denies all edit/write/bash tools; workspace-write allows edits only inside the project worktree; full (default) is unrestricted.",
-    }),
+  sandbox: Schema.Literals(["read-only", "workspace-write", "full"]).pipe(Schema.optional).annotate({
+    description:
+      "Sandbox mode governing what the agent may touch. read-only denies all edit/write/bash tools; workspace-write allows edits only inside the project worktree; full (default) is unrestricted.",
+  }),
   agents: Schema.Record(Schema.String, ConfigAgent.Info).pipe(Schema.optional).annotate({
     description: "Named built-in agent overrides and custom agent definitions",
+  }),
+  profiles: Schema.Record(Schema.String, ConfigProfile.Info).pipe(Schema.optional).annotate({
+    description:
+      "Named configuration profiles applied on request via --profile (Codex-style). A profile may override the default agent's model and editor model, and add trailing tool permission rules",
   }),
   snapshots: Schema.Boolean.pipe(Schema.optional).annotate({
     description: "Enable snapshots used for undo and revert behavior",

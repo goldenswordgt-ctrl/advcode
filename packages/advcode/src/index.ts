@@ -88,6 +88,11 @@ const cli = yargs(args)
       "low-RAM/low-CPU mode: disable background subagents, LSP, embedded UI, external skills, question tool, parallel, and experimental subsystems (web access and small plugins stay available)",
     type: "boolean",
   })
+  .option("profile", {
+    describe:
+      "apply a named configuration profile (Codex-style): overrides the default agent model and editor model, and adds trailing tool permission rules",
+    type: "string",
+  })
   .middleware(async (opts) => {
     if (opts.printLogs) process.env.OPENCODE_PRINT_LOGS = "1"
     if (opts.logLevel) process.env.OPENCODE_LOG_LEVEL = opts.logLevel
@@ -96,6 +101,9 @@ const cli = yargs(args)
     }
     if (opts.lightweight) {
       process.env.OPENCODE_LIGHTWEIGHT = "1"
+    }
+    if (opts.profile) {
+      process.env.OPENCODE_PROFILE = opts.profile
     }
 
     Heap.start()
